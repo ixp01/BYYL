@@ -1,3 +1,37 @@
+# Build directories
 build/
+debug/
+release/
+
+# Qt specific files
 *.pro_user
 *.autosave
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+Makefile.Debug
+Makefile.Release
+
+# Compiler output
+*.o
+*.obj
+*.exe
+test_runner
+CompilerFrontend
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
