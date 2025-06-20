@@ -22,6 +22,95 @@
 #include "../semantic/symbol_table.h"
 #include "../codegen/intermediate_code.h"
 
+// GUI专用分析结果结构体定义（避免与核心模块冲突）
+struct LexicalResultGUI {
+    std::vector<Token> tokens;
+    int originalDfaStates;
+    int originalAcceptStates;
+    int originalTransitions;
+    int minimizedDfaStates;
+    int minimizedAcceptStates;
+    int minimizedTransitions;
+    double compressionRatio;
+    double analysisTime;
+    size_t memoryUsage;
+};
+
+struct ASTInfo {
+    std::string rootNodeType;
+    int nodeCount;
+    int depth;
+};
+
+struct ParseInfo {
+    int reductions;
+    int shifts;
+    int conflicts;
+};
+
+struct GrammarInfo {
+    int productions;
+    int nonterminals;
+    int terminals;
+};
+
+struct SyntaxResult {
+    bool success;
+    std::string error;
+    ASTInfo astInfo;
+    ParseInfo parseInfo;
+    GrammarInfo grammarInfo;
+};
+
+struct SymbolInfoGUI {
+    std::string name;
+    std::string type;
+    int scope;
+    int line;
+};
+
+struct ScopeInfo {
+    int maxDepth;
+    int currentLevel;
+};
+
+struct SemanticErrorGUI {
+    int line;
+    std::string message;
+};
+
+struct SemanticResultGUI {
+    bool success;
+    std::vector<SymbolInfoGUI> symbols;
+    ScopeInfo scopeInfo;
+    std::vector<SemanticErrorGUI> errors;
+};
+
+struct OptimizationInfo {
+    int passes;
+    int instructionsOptimized;
+    int constantsFolded;
+};
+
+struct BlockInfo {
+    int blockCount;
+    int maxBlockSize;
+    int edges;
+};
+
+struct CodeGenStatistics {
+    int instructionCount;
+    int temporaryCount;
+    double generationTime;
+};
+
+struct CodeGenResultGUI {
+    std::string intermediateCode;
+    OptimizationInfo optimizationInfo;
+    BlockInfo blockInfo;
+    CodeGenStatistics statistics;
+};
+
 /**
  * @brief 词法分析结果面板
  */
@@ -40,11 +129,12 @@ public:
     void setDFAInfo(const QString &dfaInfo);
     void setMinimizedDFAInfo(const QString &minimizedDFAInfo);
     
-    // 统计信息
+    // 更新统计信息
     void updateStatistics(int totalTokens, int totalLines, int totalChars);
 
 private:
     QSplitter *mainSplitter;
+    QSplitter *rightSplitter;
     
     // Token表格
     QTableWidget *tokenTable;
@@ -52,8 +142,11 @@ private:
     
     // DFA信息
     QTextEdit *dfaInfoText;
-    QTextEdit *minimizedDFAInfoText;
     QGroupBox *dfaGroupBox;
+    
+    // 最小化DFA信息
+    QTextEdit *minimizedDFAInfoText;
+    QGroupBox *minimizedDfaGroupBox;
     
     // 统计信息
     QLabel *statisticsLabel;
@@ -238,6 +331,12 @@ public:
     
     // 清除所有结果
     void clearAllResults();
+    
+    // 数据绑定方法
+    void updateLexicalAnalysisResult(const LexicalResultGUI& result);
+    void updateSyntaxAnalysisResult(const SyntaxResult& result);
+    void updateSemanticAnalysisResult(const SemanticResultGUI& result);
+    void updateCodeGenerationResult(const CodeGenResultGUI& result);
 
 signals:
     void tabChanged(int index);

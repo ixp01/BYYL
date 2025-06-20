@@ -497,63 +497,55 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument *parent)
 void SyntaxHighlighter::setupHighlightingRules()
 {
     HighlightingRule rule;
-
-    // 关键字格式
-    keywordFormat.setColor(QColor(0, 0, 255));
+    
+    // 关键字高亮
+    keywordFormat.setForeground(QColor(0, 0, 255));
     keywordFormat.setFontWeight(QFont::Bold);
+    
     QStringList keywordPatterns;
-    keywordPatterns << "\\bauto\\b" << "\\bbreak\\b" << "\\bcase\\b" << "\\bchar\\b"
-                    << "\\bconst\\b" << "\\bcontinue\\b" << "\\bdefault\\b" << "\\bdo\\b"
-                    << "\\bdouble\\b" << "\\belse\\b" << "\\benum\\b" << "\\bextern\\b"
-                    << "\\bfloat\\b" << "\\bfor\\b" << "\\bgoto\\b" << "\\bif\\b"
-                    << "\\bint\\b" << "\\blong\\b" << "\\breturn\\b" << "\\bshort\\b"
-                    << "\\bsigned\\b" << "\\bsizeof\\b" << "\\bstatic\\b" << "\\bstruct\\b"
-                    << "\\bswitch\\b" << "\\btypedef\\b" << "\\bunion\\b" << "\\bunsigned\\b"
-                    << "\\bvoid\\b" << "\\bvolatile\\b" << "\\bwhile\\b" << "\\btrue\\b" << "\\bfalse\\b";
+    keywordPatterns << "\\bint\\b" << "\\bfloat\\b" << "\\bdouble\\b" << "\\bchar\\b"
+                    << "\\bif\\b" << "\\belse\\b" << "\\bwhile\\b" << "\\bfor\\b"
+                    << "\\breturn\\b" << "\\bvoid\\b" << "\\bmain\\b" << "\\bconst\\b"
+                    << "\\bstatic\\b" << "\\bextern\\b" << "\\bstruct\\b" << "\\btypedef\\b"
+                    << "\\bswitch\\b" << "\\bcase\\b" << "\\bdefault\\b" << "\\bbreak\\b"
+                    << "\\bcontinue\\b" << "\\bdo\\b" << "\\bgoto\\b";
     
     foreach (const QString &pattern, keywordPatterns) {
         rule.pattern = QRegularExpression(pattern);
         rule.format = keywordFormat;
         highlightingRules.append(rule);
     }
-
-    // 数字格式
-    numberFormat.setColor(QColor(255, 0, 255));
-    rule.pattern = QRegularExpression("\\b\\d+(\\.\\d+)?\\b");
+    
+    // 数字高亮
+    numberFormat.setForeground(QColor(255, 0, 255));
+    rule.pattern = QRegularExpression("\\b\\d+\\b");
     rule.format = numberFormat;
     highlightingRules.append(rule);
-
-    // 字符串格式
-    stringFormat.setColor(QColor(0, 128, 0));
+    
+    // 字符串高亮
+    stringFormat.setForeground(QColor(0, 128, 0));
     rule.pattern = QRegularExpression("\".*\"");
     rule.format = stringFormat;
     highlightingRules.append(rule);
-
-    // 字符格式
+    
+    // 字符高亮
     rule.pattern = QRegularExpression("'.*'");
     rule.format = stringFormat;
     highlightingRules.append(rule);
-
-    // 单行注释格式
-    commentFormat.setColor(QColor(128, 128, 128));
+    
+    // 注释高亮
+    commentFormat.setForeground(QColor(128, 128, 128));
     commentFormat.setFontItalic(true);
-    rule.pattern = QRegularExpression("//.*");
+    rule.pattern = QRegularExpression("//[^\n]*");
     rule.format = commentFormat;
     highlightingRules.append(rule);
-
-    // 运算符格式
-    operatorFormat.setColor(QColor(128, 0, 128));
-    operatorFormat.setFontWeight(QFont::Bold);
-    QStringList operatorPatterns;
-    operatorPatterns << "\\+" << "-" << "\\*" << "/" << "%" << "=" << "==" << "!="
-                     << "<" << ">" << "<=" << ">=" << "&&" << "\\|\\|" << "!" << "\\+\\+"
-                     << "--" << "\\+=" << "-=" << "\\*=" << "/=" << "%=";
     
-    foreach (const QString &pattern, operatorPatterns) {
-        rule.pattern = QRegularExpression(pattern);
-        rule.format = operatorFormat;
-        highlightingRules.append(rule);
-    }
+    // 运算符高亮
+    operatorFormat.setForeground(QColor(128, 0, 128));
+    operatorFormat.setFontWeight(QFont::Bold);
+    rule.pattern = QRegularExpression("[+\\-*/=<>!&|]+");
+    rule.format = operatorFormat;
+    highlightingRules.append(rule);
 }
 
 void SyntaxHighlighter::highlightBlock(const QString &text)
@@ -663,4 +655,3 @@ void ErrorIndicator::updateIndicators()
     }
 }
 
-#include "code_editor.moc" 

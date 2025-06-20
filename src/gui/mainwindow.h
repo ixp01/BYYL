@@ -22,8 +22,11 @@
 #include "analysis_panel.h"
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
+#include "../parser/ast.h"
 #include "../semantic/semantic_analyzer.h"
+#include "../semantic/symbol_table.h"
 #include "../codegen/code_generator.h"
+#include "../codegen/intermediate_code.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -47,9 +50,20 @@ protected:
 
 signals:
     void lexicalAnalysisFinished(const QVector<Token> &tokens);
-    void syntaxAnalysisFinished(bool success, const QString &message);
-    void semanticAnalysisFinished(bool success, const QString &message);
-    void codeGenerationFinished(bool success, const QString &message);
+    void syntaxAnalysisFinished(bool success, const QString &message, 
+                               const std::shared_ptr<ASTNode> &ast,
+                               const QString &parseInfo,
+                               const QString &grammarInfo);
+    void semanticAnalysisFinished(bool success, const QString &message,
+                                 const SymbolTable &symbolTable,
+                                 const QString &typeCheckInfo,
+                                 const QString &scopeInfo,
+                                 const QVector<SemanticError> &errors);
+    void codeGenerationFinished(bool success, const QString &message,
+                               const QVector<ThreeAddressCode> &codes,
+                               const QString &optimizationInfo,
+                               const QString &basicBlockInfo,
+                               int totalInstructions, int basicBlocks, int tempVars);
     void analysisError(const QString &error);
 
 private:
@@ -67,6 +81,9 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+signals:
+    void tabChanged(int index);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -113,15 +130,27 @@ private slots:
     
     // 分析结果信号
     void onLexicalAnalysisFinished(const QVector<Token> &tokens);
-    void onSyntaxAnalysisFinished(bool success, const QString &message);
-    void onSemanticAnalysisFinished(bool success, const QString &message);
-    void onCodeGenerationFinished(bool success, const QString &message);
+    void onSyntaxAnalysisFinished(bool success, const QString &message, 
+                                 const std::shared_ptr<ASTNode> &ast,
+                                 const QString &parseInfo,
+                                 const QString &grammarInfo);
+    void onSemanticAnalysisFinished(bool success, const QString &message,
+                                   const SymbolTable &symbolTable,
+                                   const QString &typeCheckInfo,
+                                   const QString &scopeInfo,
+                                   const QVector<SemanticError> &errors);
+    void onCodeGenerationFinished(bool success, const QString &message,
+                                 const QVector<ThreeAddressCode> &codes,
+                                 const QString &optimizationInfo,
+                                 const QString &basicBlockInfo,
+                                 int totalInstructions, int basicBlocks, int tempVars);
     void onAnalysisError(const QString &error);
     
     // 其他槽函数
     void about();
     void updateRecentFiles();
     void showContextMenu(const QPoint &pos);
+    void onTabChanged(int index);
 
 private:
     // UI组件
