@@ -1,4 +1,6 @@
 #include "mainwindow.h"
+#include "find_replace_dialog.h"
+#include "settings_dialog.h"
 #include <QApplication>
 #include <QCloseEvent>
 #include <QFileInfo>
@@ -114,6 +116,14 @@ MainWindow::MainWindow(QWidget *parent)
     autoAnalysisTimer->setSingleShot(true);
     autoAnalysisTimer->setInterval(1000); // 1秒延迟
     connect(autoAnalysisTimer, &QTimer::timeout, this, &MainWindow::runLexicalAnalysis);
+    
+    // 创建查找替换对话框
+    findReplaceDialog = new FindReplaceDialog(codeEditor, this);
+    
+    // 创建设置对话框
+    settingsDialog = new SettingsDialog(this);
+    
+    // 连接信号
 }
 
 MainWindow::~MainWindow()
@@ -178,6 +188,7 @@ void MainWindow::setupActions()
     createAction(findAction, "查找(&F)", "Ctrl+F", "查找");
     createAction(replaceAction, "替换(&R)", "Ctrl+H", "替换");
     createAction(gotoLineAction, "转到行(&G)", "Ctrl+G", "转到指定行");
+    createAction(settingsAction, "设置", "", "打开设置对话框");
     
     // 分析操作
     createAction(runLexicalAction, "词法分析(&L)", "F5", "运行词法分析");
@@ -195,8 +206,9 @@ void MainWindow::setupActions()
     createAction(resetZoomAction, "重置缩放(&R)", "Ctrl+0", "重置字体大小");
     
     // 帮助操作
-    createAction(aboutAction, "关于(&A)", "", "关于本程序");
-    createAction(aboutQtAction, "关于Qt(&Q)", "", "关于Qt");
+    createAction(aboutAction, "关于", "", "关于编译器前端");
+    createAction(aboutQtAction, "关于Qt", "", "关于Qt框架");
+    createAction(settingsAction, "设置...", "Ctrl+,", "打开设置对话框");
     
     // 设置复选框状态
     toggleLineNumbersAction->setCheckable(true);
@@ -246,6 +258,8 @@ void MainWindow::setupMenus()
     editMenu->addAction(findAction);
     editMenu->addAction(replaceAction);
     editMenu->addAction(gotoLineAction);
+    editMenu->addSeparator();
+    editMenu->addAction(settingsAction);
     
     // 分析菜单
     QMenu *analysisMenu = QMainWindow::menuBar()->addMenu("分析(&A)");
@@ -376,6 +390,7 @@ void MainWindow::setupConnections()
     // 帮助操作连接
     connect(aboutAction, &QAction::triggered, this, &MainWindow::about);
     connect(aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     
     // 代码编辑器信号连接
     connect(codeEditor, &CodeEditor::textChanged, this, &MainWindow::onTextChanged);
@@ -469,24 +484,12 @@ void MainWindow::recentFileTriggered()
 
 void MainWindow::find()
 {
-    bool ok;
-    QString text = QInputDialog::getText(this, "查找", "查找内容:", QLineEdit::Normal, "", &ok);
-    if (ok && !text.isEmpty()) {
-        codeEditor->findText(text);
-    }
+    findReplaceDialog->showFind();
 }
 
 void MainWindow::replace()
 {
-    // 这里可以实现一个更复杂的查找替换对话框
-    bool ok;
-    QString findText = QInputDialog::getText(this, "替换", "查找内容:", QLineEdit::Normal, "", &ok);
-    if (!ok || findText.isEmpty()) return;
-    
-    QString replaceText = QInputDialog::getText(this, "替换", "替换为:", QLineEdit::Normal, "", &ok);
-    if (!ok) return;
-    
-    codeEditor->replaceText(findText, replaceText);
+    findReplaceDialog->showReplace();
 }
 
 void MainWindow::gotoLine()
@@ -723,17 +726,21 @@ void MainWindow::onAnalysisError(const QString &error)
 
 void MainWindow::about()
 {
-    QMessageBox::about(this, "关于编译器",
-        "<h2>编译原理课程设计</h2>"
-        "<p>版本: 1.0</p>"
-        "<p>这是一个完整的编译器前端实现，包含:</p>"
-        "<ul>"
-        "<li>词法分析 (DFA + 最小化)</li>"
-        "<li>语法分析 (LALR)</li>"
-        "<li>语义分析 (符号表 + 类型检查)</li>"
-        "<li>中间代码生成</li>"
-        "</ul>"
-        "<p>采用Qt框架实现图形化界面</p>");
+    QMessageBox::about(this, "关于编译器前端",
+        "编译器前端 v1.0\n\n"
+        "这是一个基于Qt的现代编译器前端，支持:\n"
+        "• 词法分析 (DFA + 最小化)\n"
+        "• 语法分析 (LALR)\n"
+        "• 语义分析 (符号表 + 类型检查)\n"
+        "• 中间代码生成\n"
+        "• 实时语法高亮\n"
+        "• 多线程分析架构\n\n"
+        "技术栈: C++17 + Qt5 + 现代编译器理论");
+}
+
+void MainWindow::showSettings()
+{
+    settingsDialog->exec();
 }
 
 void MainWindow::updateRecentFiles()

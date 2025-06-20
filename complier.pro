@@ -17,6 +17,8 @@ SOURCES += \
     src/gui/mainwindow.cpp \
     src/gui/code_editor.cpp \
     src/gui/analysis_panel.cpp \
+    src/gui/find_replace_dialog.cpp \
+    src/gui/settings_dialog.cpp \
     src/lexer/token.cpp \
     src/lexer/dfa.cpp \
     src/lexer/lexer.cpp \
@@ -35,6 +37,8 @@ HEADERS += \
     src/gui/mainwindow.h \
     src/gui/code_editor.h \
     src/gui/analysis_panel.h \
+    src/gui/find_replace_dialog.h \
+    src/gui/settings_dialog.h \
     src/lexer/token.h \
     src/lexer/dfa.h \
     src/lexer/lexer.h \

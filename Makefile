@@ -56,6 +56,8 @@ SOURCES       = main.cpp \
 		src/gui/mainwindow.cpp \
 		src/gui/code_editor.cpp \
 		src/gui/analysis_panel.cpp \
+		src/gui/find_replace_dialog.cpp \
+		src/gui/settings_dialog.cpp \
 		src/lexer/token.cpp \
 		src/lexer/dfa.cpp \
 		src/lexer/lexer.cpp \
@@ -69,11 +71,15 @@ SOURCES       = main.cpp \
 		src/codegen/intermediate_code.cpp \
 		src/codegen/code_generator.cpp moc_mainwindow.cpp \
 		moc_code_editor.cpp \
-		moc_analysis_panel.cpp
+		moc_analysis_panel.cpp \
+		moc_find_replace_dialog.cpp \
+		moc_settings_dialog.cpp
 OBJECTS       = main.o \
 		mainwindow.o \
 		code_editor.o \
 		analysis_panel.o \
+		find_replace_dialog.o \
+		settings_dialog.o \
 		token.o \
 		dfa.o \
 		lexer.o \
@@ -88,7 +94,9 @@ OBJECTS       = main.o \
 		code_generator.o \
 		moc_mainwindow.o \
 		moc_code_editor.o \
-		moc_analysis_panel.o
+		moc_analysis_panel.o \
+		moc_find_replace_dialog.o \
+		moc_settings_dialog.o
 DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/common/unix.conf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/common/linux.conf \
@@ -169,6 +177,8 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		complier.pro src/gui/mainwindow.h \
 		src/gui/code_editor.h \
 		src/gui/analysis_panel.h \
+		src/gui/find_replace_dialog.h \
+		src/gui/settings_dialog.h \
 		src/lexer/token.h \
 		src/lexer/dfa.h \
 		src/lexer/lexer.h \
@@ -184,6 +194,8 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		src/gui/mainwindow.cpp \
 		src/gui/code_editor.cpp \
 		src/gui/analysis_panel.cpp \
+		src/gui/find_replace_dialog.cpp \
+		src/gui/settings_dialog.cpp \
 		src/lexer/token.cpp \
 		src/lexer/dfa.cpp \
 		src/lexer/lexer.cpp \
@@ -379,8 +391,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents src/gui/mainwindow.h src/gui/code_editor.h src/gui/analysis_panel.h src/lexer/token.h src/lexer/dfa.h src/lexer/lexer.h src/lexer/minimizer.h src/parser/grammar.h src/parser/lalr.h src/parser/parser.h src/parser/ast.h src/semantic/symbol_table.h src/semantic/semantic_analyzer.h src/codegen/intermediate_code.h src/codegen/code_generator.h $(DISTDIR)/
-	$(COPY_FILE) --parents main.cpp src/gui/mainwindow.cpp src/gui/code_editor.cpp src/gui/analysis_panel.cpp src/lexer/token.cpp src/lexer/dfa.cpp src/lexer/lexer.cpp src/lexer/minimizer.cpp src/parser/grammar.cpp src/parser/lalr.cpp src/parser/parser.cpp src/parser/ast.cpp src/semantic/symbol_table.cpp src/semantic/semantic_analyzer.cpp src/codegen/intermediate_code.cpp src/codegen/code_generator.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents src/gui/mainwindow.h src/gui/code_editor.h src/gui/analysis_panel.h src/gui/find_replace_dialog.h src/gui/settings_dialog.h src/lexer/token.h src/lexer/dfa.h src/lexer/lexer.h src/lexer/minimizer.h src/parser/grammar.h src/parser/lalr.h src/parser/parser.h src/parser/ast.h src/semantic/symbol_table.h src/semantic/semantic_analyzer.h src/codegen/intermediate_code.h src/codegen/code_generator.h $(DISTDIR)/
+	$(COPY_FILE) --parents main.cpp src/gui/mainwindow.cpp src/gui/code_editor.cpp src/gui/analysis_panel.cpp src/gui/find_replace_dialog.cpp src/gui/settings_dialog.cpp src/lexer/token.cpp src/lexer/dfa.cpp src/lexer/lexer.cpp src/lexer/minimizer.cpp src/parser/grammar.cpp src/parser/lalr.cpp src/parser/parser.cpp src/parser/ast.cpp src/semantic/symbol_table.cpp src/semantic/semantic_analyzer.cpp src/codegen/intermediate_code.cpp src/codegen/code_generator.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -412,9 +424,9 @@ compiler_moc_predefs_clean:
 moc_predefs.h: /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp
 	g++ -pipe -Wall -Wextra -std=c++17 -O2 -DNDEBUG -O2 -std=gnu++1z -Wall -Wextra -dM -E -o moc_predefs.h /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp
 
-compiler_moc_header_make_all: moc_mainwindow.cpp moc_code_editor.cpp moc_analysis_panel.cpp
+compiler_moc_header_make_all: moc_mainwindow.cpp moc_code_editor.cpp moc_analysis_panel.cpp moc_find_replace_dialog.cpp moc_settings_dialog.cpp
 compiler_moc_header_clean:
-	-$(DEL_FILE) moc_mainwindow.cpp moc_code_editor.cpp moc_analysis_panel.cpp
+	-$(DEL_FILE) moc_mainwindow.cpp moc_code_editor.cpp moc_analysis_panel.cpp moc_find_replace_dialog.cpp moc_settings_dialog.cpp
 moc_mainwindow.cpp: src/gui/mainwindow.h \
 		src/gui/code_editor.h \
 		src/gui/analysis_panel.h \
@@ -446,6 +458,16 @@ moc_analysis_panel.cpp: src/gui/analysis_panel.h \
 		moc_predefs.h \
 		/usr/lib/qt5/bin/moc
 	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/xpjiao/CS/By/complier/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/xpjiao/CS/By/complier -I/home/xpjiao/CS/By/complier/src/lexer -I/home/xpjiao/CS/By/complier/src/parser -I/home/xpjiao/CS/By/complier/src/semantic -I/home/xpjiao/CS/By/complier/src/codegen -I/home/xpjiao/CS/By/complier/src/gui -I/home/xpjiao/CS/By/complier/src/utils -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/14 -I/usr/include/x86_64-linux-gnu/c++/14 -I/usr/include/c++/14/backward -I/usr/lib/gcc/x86_64-linux-gnu/14/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include src/gui/analysis_panel.h -o moc_analysis_panel.cpp
+
+moc_find_replace_dialog.cpp: src/gui/find_replace_dialog.h \
+		moc_predefs.h \
+		/usr/lib/qt5/bin/moc
+	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/xpjiao/CS/By/complier/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/xpjiao/CS/By/complier -I/home/xpjiao/CS/By/complier/src/lexer -I/home/xpjiao/CS/By/complier/src/parser -I/home/xpjiao/CS/By/complier/src/semantic -I/home/xpjiao/CS/By/complier/src/codegen -I/home/xpjiao/CS/By/complier/src/gui -I/home/xpjiao/CS/By/complier/src/utils -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/14 -I/usr/include/x86_64-linux-gnu/c++/14 -I/usr/include/c++/14/backward -I/usr/lib/gcc/x86_64-linux-gnu/14/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include src/gui/find_replace_dialog.h -o moc_find_replace_dialog.cpp
+
+moc_settings_dialog.cpp: src/gui/settings_dialog.h \
+		moc_predefs.h \
+		/usr/lib/qt5/bin/moc
+	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/xpjiao/CS/By/complier/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/xpjiao/CS/By/complier -I/home/xpjiao/CS/By/complier/src/lexer -I/home/xpjiao/CS/By/complier/src/parser -I/home/xpjiao/CS/By/complier/src/semantic -I/home/xpjiao/CS/By/complier/src/codegen -I/home/xpjiao/CS/By/complier/src/gui -I/home/xpjiao/CS/By/complier/src/utils -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/14 -I/usr/include/x86_64-linux-gnu/c++/14 -I/usr/include/c++/14/backward -I/usr/lib/gcc/x86_64-linux-gnu/14/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include src/gui/settings_dialog.h -o moc_settings_dialog.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -492,7 +514,9 @@ mainwindow.o: src/gui/mainwindow.cpp src/gui/mainwindow.h \
 		src/parser/grammar.h \
 		src/parser/lalr.h \
 		src/semantic/semantic_analyzer.h \
-		src/codegen/code_generator.h
+		src/codegen/code_generator.h \
+		src/gui/find_replace_dialog.h \
+		src/gui/settings_dialog.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o mainwindow.o src/gui/mainwindow.cpp
 
 code_editor.o: src/gui/code_editor.cpp src/gui/code_editor.h
@@ -504,6 +528,13 @@ analysis_panel.o: src/gui/analysis_panel.cpp src/gui/analysis_panel.h \
 		src/semantic/symbol_table.h \
 		src/codegen/intermediate_code.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o analysis_panel.o src/gui/analysis_panel.cpp
+
+find_replace_dialog.o: src/gui/find_replace_dialog.cpp src/gui/find_replace_dialog.h \
+		src/gui/code_editor.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o find_replace_dialog.o src/gui/find_replace_dialog.cpp
+
+settings_dialog.o: src/gui/settings_dialog.cpp src/gui/settings_dialog.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o settings_dialog.o src/gui/settings_dialog.cpp
 
 token.o: src/lexer/token.cpp src/lexer/token.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o token.o src/lexer/token.cpp
@@ -573,6 +604,12 @@ moc_code_editor.o: moc_code_editor.cpp
 
 moc_analysis_panel.o: moc_analysis_panel.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_analysis_panel.o moc_analysis_panel.cpp
+
+moc_find_replace_dialog.o: moc_find_replace_dialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_find_replace_dialog.o moc_find_replace_dialog.cpp
+
+moc_settings_dialog.o: moc_settings_dialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_settings_dialog.o moc_settings_dialog.cpp
 
 ####### Install
 

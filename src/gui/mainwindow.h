@@ -151,6 +151,7 @@ private slots:
     void updateRecentFiles();
     void showContextMenu(const QPoint &pos);
     void onTabChanged(int index);
+    void showSettings();
 
 private:
     // UI组件
@@ -158,6 +159,10 @@ private:
     AnalysisPanel *analysisPanel;
     QSplitter *mainSplitter;
     QSplitter *rightSplitter;
+    
+    // 对话框
+    class FindReplaceDialog *findReplaceDialog;
+    class SettingsDialog *settingsDialog;
     
     // 错误信息面板
     QDockWidget *errorDock;
@@ -208,6 +213,7 @@ private:
     
     QAction *aboutAction;
     QAction *aboutQtAction;
+    QAction *settingsAction;
     
     // 最近文件列表
     QList<QAction*> recentFileActions;
