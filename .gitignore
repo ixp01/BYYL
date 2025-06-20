@@ -18,6 +18,10 @@ Makefile.Release
 *.obj
 *.exe
 test_runner
+test_*
+debug_lexer
+performance_test
+LexerDemo
 CompilerFrontend
 
 # IDE files
@@ -35,3 +39,8 @@ Thumbs.db
 *.tmp
 *.temp
 *.log
+
+# Qt MOC and qmake files
+moc_predefs.h
+.qmake.stash
+Makefile

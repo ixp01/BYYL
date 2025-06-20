@@ -228,7 +228,17 @@ Token Lexer::scanToken() {
         return scanDelimiter();
     }
     
-    // 未知字符
+    // 未知字符 - 处理UTF-8编码字符
+    if (static_cast<unsigned char>(c) > 127) {
+        // 跳过UTF-8字符序列
+        advance();
+        while (!isAtEnd() && (static_cast<unsigned char>(peek()) & 0xC0) == 0x80) {
+            advance();
+        }
+        // 忽略非ASCII字符，继续分析
+        return getNextToken();
+    }
+    
     std::string errorMsg = "Unexpected character: '";
     errorMsg += c;
     errorMsg += "'";
