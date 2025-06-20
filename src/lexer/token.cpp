@@ -59,9 +59,13 @@ std::map<TokenType, std::string> Token::typeStringMap = {
     {TokenType::RBRACE, "RBRACE"},
     {TokenType::LBRACKET, "LBRACKET"},
     {TokenType::RBRACKET, "RBRACKET"},
-    {TokenType::EOF_TOKEN, "EOF_TOKEN"},
-    {TokenType::ERROR_TOKEN, "ERROR_TOKEN"},
-    {TokenType::NEWLINE, "NEWLINE"}
+    {TokenType::END_OF_FILE, "END_OF_FILE"},
+    {TokenType::ERROR, "ERROR"},
+    {TokenType::COMMENT, "COMMENT"},
+    {TokenType::WHITESPACE, "WHITESPACE"},
+    {TokenType::DOT, "DOT"},
+    {TokenType::NEWLINE, "NEWLINE"},
+    {TokenType::UNKNOWN, "UNKNOWN"}
 };
 
 Token::Token(TokenType t, const std::string& v, int l, int c)
@@ -94,4 +98,12 @@ std::string Token::toString() const {
 
 const std::map<std::string, TokenType>& Token::getKeywordMap() {
     return keywordMap;
+}
+
+std::string Token::getTypeString(TokenType type) {
+    auto it = typeStringMap.find(type);
+    if (it != typeStringMap.end()) {
+        return it->second;
+    }
+    return "UNKNOWN";
 } 

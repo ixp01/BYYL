@@ -61,9 +61,13 @@ enum class TokenType {
     RBRACKET,       // ]
     
     // 特殊
-    EOF_TOKEN,      // 文件结束
-    ERROR_TOKEN,    // 错误token
+    END_OF_FILE,    // 文件结束
+    ERROR,          // 错误token
+    COMMENT,        // 注释
+    WHITESPACE,     // 空白符
+    DOT,            // 点号
     NEWLINE,        // 换行符
+    UNKNOWN,        // 未知类型
     
     // AST专用（非词法单元）
     INDEX,          // 数组索引
@@ -83,7 +87,7 @@ public:
     /**
      * @brief 构造函数
      */
-    Token(TokenType t = TokenType::ERROR_TOKEN, 
+    Token(TokenType t = TokenType::ERROR, 
           const std::string& v = "", 
           int l = 1, 
           int c = 1);
@@ -113,8 +117,15 @@ public:
      */
     static const std::map<std::string, TokenType>& getKeywordMap();
     
-private:
+    /**
+     * @brief 获取Token类型的字符串表示（静态方法）
+     */
+    static std::string getTypeString(TokenType type);
+    
+    // 公开关键字映射，供其他模块使用
     static std::map<std::string, TokenType> keywordMap;
+    
+private:
     static std::map<TokenType, std::string> typeStringMap;
 };
 
