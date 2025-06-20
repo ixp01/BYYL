@@ -9,19 +9,20 @@ BUILD_DIR = build
 
 # Source files
 LEXER_SOURCES = $(SRC_DIR)/lexer/token.cpp $(SRC_DIR)/lexer/dfa.cpp $(SRC_DIR)/lexer/lexer.cpp $(SRC_DIR)/lexer/minimizer.cpp
-PARSER_SOURCES = 
+PARSER_SOURCES = $(SRC_DIR)/parser/grammar.cpp $(SRC_DIR)/parser/lalr.cpp $(SRC_DIR)/parser/parser.cpp $(SRC_DIR)/parser/ast.cpp
 SEMANTIC_SOURCES = 
 GUI_SOURCES = 
 
 # Test files
-TEST_SOURCES = $(TEST_DIR)/test_main.cpp $(TEST_DIR)/test_lexer.cpp
+TEST_SOURCES = $(TEST_DIR)/test_main.cpp $(TEST_DIR)/test_lexer.cpp $(TEST_DIR)/test_parser.cpp
 
 # Object files
 LEXER_OBJECTS = $(LEXER_SOURCES:.cpp=.o)
+PARSER_OBJECTS = $(PARSER_SOURCES:.cpp=.o)
 TEST_OBJECTS = $(TEST_SOURCES:.cpp=.o)
 
 # Targets
-.PHONY: all test clean qt-build qt-test
+.PHONY: all test test-parser clean qt-build qt-test
 
 all: qt-build
 
@@ -38,6 +39,13 @@ test-lexer: tests/test_lexer.o $(LEXER_OBJECTS)
 	$(CXX) $(CXXFLAGS) -o test_lexer tests/test_lexer.o $(LEXER_OBJECTS)
 	@echo "Running lexer tests..."
 	./test_lexer
+
+# Test only parser components
+test-parser: tests/test_parser.o $(PARSER_OBJECTS) $(LEXER_OBJECTS)
+	@echo "Building parser test executable..."
+	$(CXX) $(CXXFLAGS) -o test_parser tests/test_parser.o $(PARSER_OBJECTS) $(LEXER_OBJECTS)
+	@echo "Running parser tests..."
+	./test_parser
 
 # Build Qt application
 qt-build:
@@ -59,19 +67,19 @@ qt-test:
 # Clean build files
 clean:
 	@echo "Cleaning build files..."
-	rm -f test_runner test_lexer
+	rm -f test_runner test_lexer test_parser
 	rm -f CompilerFrontend
-	rm -f $(LEXER_OBJECTS) $(TEST_OBJECTS)
-	rm -f Makefile
+	rm -f $(LEXER_OBJECTS) $(PARSER_OBJECTS) $(TEST_OBJECTS)
 	rm -f *.o
 	rm -rf build
 
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  all        - Build Qt application (default)"
-	@echo "  test       - Build and run all tests"
-	@echo "  test-lexer - Build and run lexer tests only"
-	@echo "  qt-build   - Build Qt application"
-	@echo "  clean      - Clean build files"
-	@echo "  help       - Show this help" 
+	@echo "  all         - Build Qt application (default)"
+	@echo "  test        - Build and run all tests"
+	@echo "  test-lexer  - Build and run lexer tests only"
+	@echo "  test-parser - Build and run parser tests only"
+	@echo "  qt-build    - Build Qt application"
+	@echo "  clean       - Clean build files"
+	@echo "  help        - Show this help" 

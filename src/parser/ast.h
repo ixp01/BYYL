@@ -201,6 +201,77 @@ public:
 };
 
 /**
+ * @brief 返回语句节点
+ */
+class ReturnStmtNode : public StmtNode {
+public:
+    std::unique_ptr<ExprNode> expression;  // 可为nullptr
+    
+    ReturnStmtNode(std::unique_ptr<ExprNode> expr = nullptr,
+                   int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief 表达式语句节点
+ */
+class ExpressionStmtNode : public StmtNode {
+public:
+    std::unique_ptr<ExprNode> expression;
+    
+    ExpressionStmtNode(std::unique_ptr<ExprNode> expr,
+                       int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief 声明节点基类
+ */
+class DeclNode : public ASTNode {
+public:
+    DeclNode(ASTNodeType type, int l = 0, int c = 0) 
+        : ASTNode(type, l, c) {}
+};
+
+/**
+ * @brief 变量声明节点
+ */
+class VariableDeclNode : public DeclNode {
+public:
+    std::string name;
+    TokenType varType;
+    std::unique_ptr<ExprNode> initializer;  // 可为nullptr
+    
+    VariableDeclNode(const std::string& n, 
+                     TokenType t,
+                     std::unique_ptr<ExprNode> init = nullptr,
+                     int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief 函数声明节点
+ */
+class FunctionDeclNode : public DeclNode {
+public:
+    std::string name;
+    TokenType returnType;
+    std::vector<std::unique_ptr<VariableDeclNode>> parameters;
+    std::unique_ptr<BlockStmtNode> body;
+    
+    FunctionDeclNode(const std::string& n, 
+                     TokenType retType,
+                     std::vector<std::unique_ptr<VariableDeclNode>> params,
+                     std::unique_ptr<BlockStmtNode> body,
+                     int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
  * @brief 变量声明节点
  */
 class VarDeclNode : public StmtNode {
@@ -222,11 +293,11 @@ public:
  */
 class ProgramNode : public ASTNode {
 public:
-    std::vector<std::unique_ptr<StmtNode>> statements;
+    std::vector<std::unique_ptr<DeclNode>> declarations;
     
     ProgramNode();
     
-    void addStatement(std::unique_ptr<StmtNode> stmt);
+    void addDeclaration(std::unique_ptr<DeclNode> decl);
     void print(int indent = 0) const override;
 };
 
