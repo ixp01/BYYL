@@ -10,15 +10,16 @@ BUILD_DIR = build
 # Source files
 LEXER_SOURCES = $(SRC_DIR)/lexer/token.cpp $(SRC_DIR)/lexer/dfa.cpp $(SRC_DIR)/lexer/lexer.cpp $(SRC_DIR)/lexer/minimizer.cpp
 PARSER_SOURCES = $(SRC_DIR)/parser/grammar.cpp $(SRC_DIR)/parser/lalr.cpp $(SRC_DIR)/parser/parser.cpp $(SRC_DIR)/parser/ast.cpp
-SEMANTIC_SOURCES = 
+SEMANTIC_SOURCES = $(SRC_DIR)/semantic/symbol_table.cpp $(SRC_DIR)/semantic/semantic_analyzer.cpp
 GUI_SOURCES = 
 
 # Test files
-TEST_SOURCES = $(TEST_DIR)/test_main.cpp $(TEST_DIR)/test_lexer.cpp $(TEST_DIR)/test_parser.cpp
+TEST_SOURCES = $(TEST_DIR)/test_main.cpp $(TEST_DIR)/test_lexer.cpp $(TEST_DIR)/test_parser.cpp $(TEST_DIR)/test_semantic.cpp
 
 # Object files
 LEXER_OBJECTS = $(LEXER_SOURCES:.cpp=.o)
 PARSER_OBJECTS = $(PARSER_SOURCES:.cpp=.o)
+SEMANTIC_OBJECTS = $(SEMANTIC_SOURCES:.cpp=.o)
 TEST_OBJECTS = $(TEST_SOURCES:.cpp=.o)
 
 # Targets
@@ -27,9 +28,9 @@ TEST_OBJECTS = $(TEST_SOURCES:.cpp=.o)
 all: qt-build
 
 # Test only the core components (without Qt)
-test: $(TEST_OBJECTS) $(LEXER_OBJECTS)
+test: $(TEST_OBJECTS) $(LEXER_OBJECTS) $(PARSER_OBJECTS) $(SEMANTIC_OBJECTS)
 	@echo "Building test executable..."
-	$(CXX) $(CXXFLAGS) -o test_runner $(TEST_OBJECTS) $(LEXER_OBJECTS)
+	$(CXX) $(CXXFLAGS) -o test_runner $(TEST_OBJECTS) $(LEXER_OBJECTS) $(PARSER_OBJECTS) $(SEMANTIC_OBJECTS)
 	@echo "Running tests..."
 	./test_runner
 
@@ -46,6 +47,13 @@ test-parser: tests/test_parser.o $(PARSER_OBJECTS) $(LEXER_OBJECTS)
 	$(CXX) $(CXXFLAGS) -o test_parser tests/test_parser.o $(PARSER_OBJECTS) $(LEXER_OBJECTS)
 	@echo "Running parser tests..."
 	./test_parser
+
+# Test only semantic components
+test-semantic: tests/test_semantic.o $(SEMANTIC_OBJECTS) $(PARSER_OBJECTS) $(LEXER_OBJECTS)
+	@echo "Building semantic test executable..."
+	$(CXX) $(CXXFLAGS) -o test_semantic tests/test_semantic.o $(SEMANTIC_OBJECTS) $(PARSER_OBJECTS) $(LEXER_OBJECTS)
+	@echo "Running semantic tests..."
+	./test_semantic
 
 # Build Qt application
 qt-build:
@@ -67,19 +75,20 @@ qt-test:
 # Clean build files
 clean:
 	@echo "Cleaning build files..."
-	rm -f test_runner test_lexer test_parser
+	rm -f test_runner test_lexer test_parser test_semantic
 	rm -f CompilerFrontend
-	rm -f $(LEXER_OBJECTS) $(PARSER_OBJECTS) $(TEST_OBJECTS)
+	rm -f $(LEXER_OBJECTS) $(PARSER_OBJECTS) $(SEMANTIC_OBJECTS) $(TEST_OBJECTS)
 	rm -f *.o
 	rm -rf build
 
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  all         - Build Qt application (default)"
-	@echo "  test        - Build and run all tests"
-	@echo "  test-lexer  - Build and run lexer tests only"
-	@echo "  test-parser - Build and run parser tests only"
-	@echo "  qt-build    - Build Qt application"
-	@echo "  clean       - Clean build files"
-	@echo "  help        - Show this help" 
+	@echo "  all           - Build Qt application (default)"
+	@echo "  test          - Build and run all tests"
+	@echo "  test-lexer    - Build and run lexer tests only"
+	@echo "  test-parser   - Build and run parser tests only"
+	@echo "  test-semantic - Build and run semantic tests only"
+	@echo "  qt-build      - Build Qt application"
+	@echo "  clean         - Clean build files"
+	@echo "  help          - Show this help" 
