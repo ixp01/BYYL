@@ -12,7 +12,7 @@
 /**
  * @brief 文法符号类型枚举
  */
-enum class SymbolType {
+enum class GrammarSymbolType {
     TERMINAL,       // 终结符
     NON_TERMINAL,   // 非终结符
     EPSILON         // 空符号ε
@@ -24,12 +24,12 @@ enum class SymbolType {
 class Symbol {
 public:
     std::string name;           // 符号名称
-    SymbolType type;            // 符号类型
+    GrammarSymbolType type;     // 符号类型
     TokenType tokenType;        // 对应的Token类型（仅终结符有效）
     int id;                     // 符号唯一ID
     
     Symbol() = default;
-    Symbol(const std::string& n, SymbolType t, int symbolId = -1, 
+    Symbol(const std::string& n, GrammarSymbolType t, int symbolId = -1, 
            TokenType tType = TokenType::UNKNOWN);
     
     bool isTerminal() const;

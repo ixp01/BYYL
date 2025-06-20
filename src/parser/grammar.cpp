@@ -5,28 +5,28 @@
 #include <queue>
 
 // Symbol类实现
-Symbol::Symbol(const std::string& n, SymbolType t, int symbolId, TokenType tType)
+Symbol::Symbol(const std::string& n, GrammarSymbolType t, int symbolId, TokenType tType)
     : name(n), type(t), tokenType(tType), id(symbolId) {}
 
 bool Symbol::isTerminal() const {
-    return type == SymbolType::TERMINAL;
+    return type == GrammarSymbolType::TERMINAL;
 }
 
 bool Symbol::isNonTerminal() const {
-    return type == SymbolType::NON_TERMINAL;
+    return type == GrammarSymbolType::NON_TERMINAL;
 }
 
 bool Symbol::isEpsilon() const {
-    return type == SymbolType::EPSILON;
+    return type == GrammarSymbolType::EPSILON;
 }
 
 std::string Symbol::toString() const {
     switch (type) {
-        case SymbolType::TERMINAL:
+        case GrammarSymbolType::TERMINAL:
             return name;
-        case SymbolType::NON_TERMINAL:
+        case GrammarSymbolType::NON_TERMINAL:
             return name;
-        case SymbolType::EPSILON:
+        case GrammarSymbolType::EPSILON:
             return "ε";
         default:
             return "UNKNOWN";
@@ -190,8 +190,8 @@ bool LRItemSet::operator==(const LRItemSet& other) const {
 // Grammar类实现
 Grammar::Grammar() : nextSymbolId(0), nextProductionId(0) {
     // 初始化特殊符号
-    epsilonSymbol = Symbol("ε", SymbolType::EPSILON, nextSymbolId++);
-    endSymbol = Symbol("$", SymbolType::TERMINAL, nextSymbolId++, TokenType::END_OF_FILE);
+    epsilonSymbol = Symbol("ε", GrammarSymbolType::EPSILON, nextSymbolId++);
+    endSymbol = Symbol("$", GrammarSymbolType::TERMINAL, nextSymbolId++, TokenType::END_OF_FILE);
     
     symbols["ε"] = epsilonSymbol;
     symbols["$"] = endSymbol;
@@ -203,7 +203,7 @@ Symbol Grammar::addTerminal(const std::string& name, TokenType tokenType) {
         return getSymbol(name);
     }
     
-    Symbol symbol(name, SymbolType::TERMINAL, nextSymbolId++, tokenType);
+    Symbol symbol(name, GrammarSymbolType::TERMINAL, nextSymbolId++, tokenType);
     symbols[name] = symbol;
     terminals.insert(symbol);
     return symbol;
@@ -214,7 +214,7 @@ Symbol Grammar::addNonTerminal(const std::string& name) {
         return getSymbol(name);
     }
     
-    Symbol symbol(name, SymbolType::NON_TERMINAL, nextSymbolId++);
+    Symbol symbol(name, GrammarSymbolType::NON_TERMINAL, nextSymbolId++);
     symbols[name] = symbol;
     nonTerminals.insert(symbol);
     return symbol;

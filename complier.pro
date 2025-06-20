@@ -15,6 +15,8 @@ INCLUDEPATH += src/lexer src/parser src/semantic src/codegen src/gui src/utils
 SOURCES += \
     main.cpp \
     src/gui/mainwindow.cpp \
+    src/gui/code_editor.cpp \
+    src/gui/analysis_panel.cpp \
     src/lexer/token.cpp \
     src/lexer/dfa.cpp \
     src/lexer/lexer.cpp \
@@ -31,6 +33,8 @@ SOURCES += \
 # 头文件
 HEADERS += \
     src/gui/mainwindow.h \
+    src/gui/code_editor.h \
+    src/gui/analysis_panel.h \
     src/lexer/token.h \
     src/lexer/dfa.h \
     src/lexer/lexer.h \
@@ -43,10 +47,6 @@ HEADERS += \
     src/semantic/semantic_analyzer.h \
     src/codegen/intermediate_code.h \
     src/codegen/code_generator.h
-
-# UI文件
-FORMS += \
-    src/gui/ui/mainwindow.ui
 
 # 测试配置（可选编译）
 test {
