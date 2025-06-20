@@ -4,6 +4,12 @@
 #include <utility>
 #include "../src/lexer/token.h"
 
+// 声明各模块的测试函数
+extern int runLexerTests();
+extern int runParserTests(); 
+extern int runSemanticTests();
+extern int runCodegenTests();
+
 /**
  * @brief 测试Token类的基本功能
  */
@@ -77,20 +83,51 @@ void printTokenTypes() {
 }
 
 int main() {
-    std::cout << "=== Compiler Frontend Test Suite ===" << std::endl;
+    std::cout << "=== Complete Compiler Frontend Test Suite ===" << std::endl;
+    
+    int totalErrors = 0;
     
     try {
+        // 基础Token测试
+        std::cout << "\n--- Basic Token Tests ---" << std::endl;
         testToken();
         testKeywordMapping();
         printTokenTypes();
         
-        std::cout << "\n✅ All tests passed successfully!" << std::endl;
-        return 0;
+        // 词法分析器测试
+        std::cout << "\n--- Lexer Tests ---" << std::endl;
+        totalErrors += runLexerTests();
+        
+        // 语法分析器测试  
+        std::cout << "\n--- Parser Tests ---" << std::endl;
+        totalErrors += runParserTests();
+        
+        // 语义分析器测试
+        std::cout << "\n--- Semantic Analysis Tests ---" << std::endl; 
+        totalErrors += runSemanticTests();
+        
+        // 代码生成器测试
+        std::cout << "\n--- Code Generation Tests ---" << std::endl;
+        totalErrors += runCodegenTests();
+        
+        if (totalErrors == 0) {
+            std::cout << "\n🎉 All compiler modules tested successfully!" << std::endl;
+            std::cout << "✅ Basic Token functionality" << std::endl;
+            std::cout << "✅ Lexical Analysis (DFA + Minimization)" << std::endl;
+            std::cout << "✅ Syntax Analysis (LALR Parser)" << std::endl; 
+            std::cout << "✅ Semantic Analysis (Symbol Table + Type Checking)" << std::endl;
+            std::cout << "✅ Code Generation (Three-Address Code)" << std::endl;
+            return 0;
+        } else {
+            std::cout << "\n❌ Some tests failed. Total errors: " << totalErrors << std::endl;
+            return 1;
+        }
+        
     } catch (const std::exception& e) {
-        std::cout << "\n❌ Test failed with exception: " << e.what() << std::endl;
+        std::cout << "\n❌ Test suite failed with exception: " << e.what() << std::endl;
         return 1;
     } catch (...) {
-        std::cout << "\n❌ Test failed with unknown exception!" << std::endl;
+        std::cout << "\n❌ Test suite failed with unknown exception!" << std::endl;
         return 1;
     }
 } 

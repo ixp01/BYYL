@@ -150,7 +150,7 @@ void testSourceParsing() {
     std::cout << "Source parsing: " << successCount << "/" << testCases.size() << " passed\n";
 }
 
-void testErrorHandling() {
+void testParserErrorHandling() {
     std::cout << "Testing error handling...\n";
     
     auto parser = Parser::createSimpleExpressionParser();
@@ -294,7 +294,7 @@ void testAST() {
     std::cout << "✓ AST tests passed!\n";
 }
 
-int main() {
+int runParserTests() {
     std::cout << "=== Parser Module Test Suite ===\n\n";
     
     try {
@@ -306,7 +306,7 @@ int main() {
         testFactoryMethods();
         testBasicParsing();
         testSourceParsing();
-        testErrorHandling();
+        testParserErrorHandling();
         testAST();
         testParserStatistics();
         testParserPerformance();

@@ -241,7 +241,7 @@ void testPerformance() {
 /**
  * @brief 运行所有词法分析器测试
  */
-int main() {
+int runLexerTests() {
     std::cout << "=== Lexer Module Test Suite ===" << std::endl;
     
     try {

@@ -191,7 +191,7 @@ void testScopeManagement() {
     std::cout << "✓ Scope Management tests passed!" << std::endl;
 }
 
-void performanceTest() {
+void semanticPerformanceTest() {
     std::cout << "Performing Semantic Analysis Performance Test..." << std::endl;
     
     auto analyzer = SemanticAnalyzerFactory::createStandard();
@@ -217,7 +217,7 @@ void performanceTest() {
     std::cout << "✓ Performance test completed!" << std::endl;
 }
 
-int main() {
+int runSemanticTests() {
     std::cout << "=== Semantic Analysis Module Test Suite ===" << std::endl;
     
     try {

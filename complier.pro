@@ -15,13 +15,34 @@ INCLUDEPATH += src/lexer src/parser src/semantic src/codegen src/gui src/utils
 SOURCES += \
     main.cpp \
     src/gui/mainwindow.cpp \
-    src/lexer/token.cpp
+    src/lexer/token.cpp \
+    src/lexer/dfa.cpp \
+    src/lexer/lexer.cpp \
+    src/lexer/minimizer.cpp \
+    src/parser/grammar.cpp \
+    src/parser/lalr.cpp \
+    src/parser/parser.cpp \
+    src/parser/ast.cpp \
+    src/semantic/symbol_table.cpp \
+    src/semantic/semantic_analyzer.cpp \
+    src/codegen/intermediate_code.cpp \
+    src/codegen/code_generator.cpp
 
 # 头文件
 HEADERS += \
     src/gui/mainwindow.h \
     src/lexer/token.h \
-    src/parser/ast.h
+    src/lexer/dfa.h \
+    src/lexer/lexer.h \
+    src/lexer/minimizer.h \
+    src/parser/grammar.h \
+    src/parser/lalr.h \
+    src/parser/parser.h \
+    src/parser/ast.h \
+    src/semantic/symbol_table.h \
+    src/semantic/semantic_analyzer.h \
+    src/codegen/intermediate_code.h \
+    src/codegen/code_generator.h
 
 # UI文件
 FORMS += \
