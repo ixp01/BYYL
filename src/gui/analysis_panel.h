@@ -187,7 +187,7 @@ private:
     QTreeWidget *astTree;
     QGroupBox *astGroupBox;
     
-    // 语法分析信息
+    // 解析信息
     QTextEdit *parseInfoText;
     QGroupBox *parseInfoGroupBox;
     
@@ -199,13 +199,15 @@ private:
     QTextEdit *lalrTableText;
     QGroupBox *lalrTableGroupBox;
     
-    // 错误列表
-    QListWidget *errorList;
-    QGroupBox *errorGroupBox;
+    // 解析错误列表
+    QListWidget *parseErrorsList;
+    QGroupBox *parseErrorsGroupBox;
     
     void setupUI();
     void populateASTTree(QTreeWidgetItem *parent, const std::shared_ptr<ASTNode> &node);
     QString getNodeTypeString(ASTNodeType type);
+    void setASTNodeStyle(QTreeWidgetItem *item, ASTNodeType type);
+    void setASTNodeStyleByString(QTreeWidgetItem *item, const QString &nodeType);
 };
 
 /**
@@ -220,6 +222,7 @@ public:
     
     // 设置符号表
     void setSymbolTable(const SymbolTable &symbolTable);
+    void setSymbolTableInfo(const QString &symbolTableInfo);
     void clearSymbolTable();
     
     // 设置类型检查信息
@@ -254,6 +257,7 @@ private:
     
     void setupUI();
     void populateSymbolTable(const SymbolTable &symbolTable);
+    void addScopeToTree(QTreeWidgetItem *parent, Scope* scope);
     QString getSymbolTypeString(SymbolType type);
     QString getDataTypeString(DataType type);
 };

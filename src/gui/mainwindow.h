@@ -18,6 +18,11 @@
 #include <QListWidget>
 #include <QDockWidget>
 
+// Qt6 兼容性
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QStringConverter>
+#endif
+
 #include "code_editor.h"
 #include "analysis_panel.h"
 #include "../lexer/lexer.h"
@@ -34,6 +39,22 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+// 前向声明
+class AnalysisPanel;
+
+// 简单的AST节点实现（具体类，可以实例化）
+class SimpleASTNode : public ASTNode {
+public:
+    SimpleASTNode(ASTNodeType type, int line = 0, int col = 0) 
+        : ASTNode(type, line, col) {}
+    
+    void print(int indent = 0) const override {
+        printIndent(indent);
+        // 简化实现，不依赖iostream
+        Q_UNUSED(indent)
+    }
+};
+
 /**
  * @brief 编译分析线程
  */
@@ -42,20 +63,32 @@ class AnalysisThread : public QThread
     Q_OBJECT
 
 public:
+    enum class AnalysisType {
+        LEXICAL_ONLY,
+        SYNTAX_ONLY, 
+        SEMANTIC_ONLY,
+        CODEGEN_ONLY,
+        FULL_ANALYSIS
+    };
+
     explicit AnalysisThread(QObject *parent = nullptr);
     void setSourceCode(const QString &code);
+    void setAnalysisType(AnalysisType type);
 
 protected:
     void run() override;
 
 signals:
     void lexicalAnalysisFinished(const QVector<Token> &tokens);
+    void lexicalAnalysisFinishedWithDFA(const QVector<Token> &tokens, 
+                                       size_t originalStates, size_t minimizedStates,
+                                       double compressionRatio);
     void syntaxAnalysisFinished(bool success, const QString &message, 
                                const std::shared_ptr<ASTNode> &ast,
                                const QString &parseInfo,
                                const QString &grammarInfo);
     void semanticAnalysisFinished(bool success, const QString &message,
-                                 const SymbolTable &symbolTable,
+                                 const QString &symbolTableInfo,
                                  const QString &typeCheckInfo,
                                  const QString &scopeInfo,
                                  const QVector<SemanticError> &errors);
@@ -65,10 +98,18 @@ signals:
                                const QString &basicBlockInfo,
                                int totalInstructions, int basicBlocks, int tempVars);
     void analysisError(const QString &error);
+    void analysisProgress(const QString &stage);
 
 private:
     QString m_sourceCode;
     QMutex m_mutex;
+    AnalysisType m_analysisType;
+    
+    // 辅助方法
+    std::shared_ptr<ASTNode> createSimpleParser();
+    std::shared_ptr<ASTNode> parseTokensToAST(const std::vector<Token>& tokens);
+    int countASTNodes(ASTNode* node);
+    int getASTDepth(ASTNode* node);
 };
 
 /**
@@ -130,21 +171,28 @@ private slots:
     
     // 分析结果信号
     void onLexicalAnalysisFinished(const QVector<Token> &tokens);
+    void onLexicalAnalysisFinishedWithDFA(const QVector<Token> &tokens, 
+                                         size_t originalStates, size_t minimizedStates,
+                                         double compressionRatio);
     void onSyntaxAnalysisFinished(bool success, const QString &message, 
                                  const std::shared_ptr<ASTNode> &ast,
                                  const QString &parseInfo,
                                  const QString &grammarInfo);
     void onSemanticAnalysisFinished(bool success, const QString &message,
-                                   const SymbolTable &symbolTable,
-                                   const QString &typeCheckInfo,
-                                   const QString &scopeInfo,
-                                   const QVector<SemanticError> &errors);
+                                    const QString &symbolTableInfo,
+                                    const QString &typeCheckInfo,
+                                    const QString &scopeInfo,
+                                    const QVector<SemanticError> &errors);
     void onCodeGenerationFinished(bool success, const QString &message,
                                  const QVector<ThreeAddressCode> &codes,
                                  const QString &optimizationInfo,
                                  const QString &basicBlockInfo,
                                  int totalInstructions, int basicBlocks, int tempVars);
     void onAnalysisError(const QString &error);
+    
+    // 错误显示
+    void showErrorInEditor(int line, const QString &message);
+    void clearAllErrors();
     
     // 其他槽函数
     void about();

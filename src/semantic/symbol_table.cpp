@@ -86,6 +86,38 @@ SymbolTable::SymbolTable()
     scopeStack.push(currentScope);
 }
 
+// 复制构造函数
+SymbolTable::SymbolTable(const SymbolTable& other)
+    : globalScope(std::make_unique<Scope>(0)),
+      currentScope(globalScope.get()),
+      nextScopeLevel(other.nextScopeLevel) {
+    scopeStack.push(currentScope);
+    
+    // 简化实现：只复制全局作用域的符号
+    if (other.globalScope) {
+        for (const auto& pair : other.globalScope->symbols) {
+            globalScope->symbols[pair.first] = pair.second;
+        }
+    }
+}
+
+// 赋值运算符
+SymbolTable& SymbolTable::operator=(const SymbolTable& other) {
+    if (this != &other) {
+        // 清空当前状态
+        clear();
+        nextScopeLevel = other.nextScopeLevel;
+        
+        // 复制全局作用域的符号
+        if (other.globalScope) {
+            for (const auto& pair : other.globalScope->symbols) {
+                globalScope->symbols[pair.first] = pair.second;
+            }
+        }
+    }
+    return *this;
+}
+
 void SymbolTable::enterScope() {
     // 创建新的子作用域
     auto newScope = std::make_unique<Scope>(nextScopeLevel++, currentScope);

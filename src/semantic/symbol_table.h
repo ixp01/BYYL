@@ -130,6 +130,10 @@ public:
     SymbolTable();
     ~SymbolTable() = default;
     
+    // 复制构造函数和赋值运算符
+    SymbolTable(const SymbolTable& other);
+    SymbolTable& operator=(const SymbolTable& other);
+    
     /**
      * @brief 进入新作用域
      */

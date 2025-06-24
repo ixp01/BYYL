@@ -123,6 +123,63 @@ struct ThreeAddressCode {
     ThreeAddressCode(OpType operation, int line = 0)
         : op(operation), lineNumber(line) {}
     
+    // 复制构造函数
+    ThreeAddressCode(const ThreeAddressCode& other)
+        : op(other.op), comment(other.comment), lineNumber(other.lineNumber) {
+        if (other.result) {
+            result = std::make_unique<Operand>(*other.result);
+        }
+        if (other.arg1) {
+            arg1 = std::make_unique<Operand>(*other.arg1);
+        }
+        if (other.arg2) {
+            arg2 = std::make_unique<Operand>(*other.arg2);
+        }
+    }
+    
+    // 拷贝赋值运算符
+    ThreeAddressCode& operator=(const ThreeAddressCode& other) {
+        if (this != &other) {
+            op = other.op;
+            comment = other.comment;
+            lineNumber = other.lineNumber;
+            
+            result.reset();
+            arg1.reset();
+            arg2.reset();
+            
+            if (other.result) {
+                result = std::make_unique<Operand>(*other.result);
+            }
+            if (other.arg1) {
+                arg1 = std::make_unique<Operand>(*other.arg1);
+            }
+            if (other.arg2) {
+                arg2 = std::make_unique<Operand>(*other.arg2);
+            }
+        }
+        return *this;
+    }
+    
+    // 移动构造函数
+    ThreeAddressCode(ThreeAddressCode&& other) noexcept
+        : op(other.op), result(std::move(other.result)), 
+          arg1(std::move(other.arg1)), arg2(std::move(other.arg2)),
+          comment(std::move(other.comment)), lineNumber(other.lineNumber) {}
+    
+    // 移动赋值运算符
+    ThreeAddressCode& operator=(ThreeAddressCode&& other) noexcept {
+        if (this != &other) {
+            op = other.op;
+            result = std::move(other.result);
+            arg1 = std::move(other.arg1);
+            arg2 = std::move(other.arg2);
+            comment = std::move(other.comment);
+            lineNumber = other.lineNumber;
+        }
+        return *this;
+    }
+    
     std::string toString() const;
     std::string getOpString() const;
     bool isJump() const;

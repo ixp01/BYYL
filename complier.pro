@@ -2,11 +2,30 @@ QT       += core gui
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
+# 移除core5compat依赖，改用条件编译
+# greaterThan(QT_MAJOR_VERSION, 5) {
+#     QT += core5compat
+# }
+
 CONFIG += c++17
 
 # 项目名称
 TARGET = CompilerFrontend
 TEMPLATE = app
+
+# 编译器标志
+QMAKE_CXXFLAGS += -Wall -Wextra -std=c++17
+
+# Debug配置
+CONFIG(debug, debug|release) {
+    DEFINES += DEBUG_MODE
+    QMAKE_CXXFLAGS += -g -O0
+}
+
+# Release配置
+CONFIG(release, debug|release) {
+    QMAKE_CXXFLAGS += -O2 -DNDEBUG
+}
 
 # 包含目录
 INCLUDEPATH += src/lexer src/parser src/semantic src/codegen src/gui src/utils
@@ -57,20 +76,6 @@ test {
     SOURCES += tests/test_main.cpp
     TARGET = test_runner
     QT -= gui widgets
-}
-
-# 编译器标志
-QMAKE_CXXFLAGS += -Wall -Wextra -std=c++17
-
-# Debug配置
-CONFIG(debug, debug|release) {
-    DEFINES += DEBUG_MODE
-    QMAKE_CXXFLAGS += -g -O0
-}
-
-# Release配置
-CONFIG(release, debug|release) {
-    QMAKE_CXXFLAGS += -O2 -DNDEBUG
 }
 
 # 默认部署规则

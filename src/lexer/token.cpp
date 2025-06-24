@@ -15,7 +15,25 @@ std::map<std::string, TokenType> Token::keywordMap = {
     {"float", TokenType::FLOAT},
     {"bool", TokenType::BOOL},
     {"true", TokenType::TRUE},
-    {"false", TokenType::FALSE}
+    {"false", TokenType::FALSE},
+    
+    {"char", TokenType::INT},
+    {"double", TokenType::FLOAT},
+    {"void", TokenType::INT},
+    {"const", TokenType::INT},
+    {"static", TokenType::INT},
+    {"struct", TokenType::INT},
+    {"enum", TokenType::INT},
+    {"sizeof", TokenType::INT},
+    
+    {"class", TokenType::INT},
+    {"public", TokenType::INT},
+    {"private", TokenType::INT},
+    {"protected", TokenType::INT},
+    {"namespace", TokenType::INT},
+    {"using", TokenType::INT},
+    {"template", TokenType::INT},
+    {"typename", TokenType::INT}
 };
 
 std::map<TokenType, std::string> Token::typeStringMap = {

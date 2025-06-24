@@ -40,6 +40,9 @@ struct SemanticError {
     int column;                 // 错误列号
     std::string context;        // 错误上下文
     
+    // 默认构造函数
+    SemanticError() : type(SemanticErrorType::SCOPE_ERROR), message(""), line(0), column(0), context("") {}
+    
     SemanticError(SemanticErrorType t, const std::string& msg, 
                   int l = 0, int c = 0, const std::string& ctx = "")
         : type(t), message(msg), line(l), column(c), context(ctx) {}

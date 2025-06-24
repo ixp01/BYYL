@@ -12,6 +12,14 @@
 #include <QTextCharFormat>
 #include <QRegularExpression>
 
+// Qt6 兼容性
+#include <QWidget>
+#include <QSize>
+#include <QObject>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QStringConverter>
+#endif
+
 // 前向声明
 class LineNumberArea;
 class SyntaxHighlighter;
@@ -67,6 +75,7 @@ private slots:
     void highlightCurrentLine();
     void updateLineNumberArea(const QRect &rect, int dy);
     void onTextChanged();
+    void onCursorPositionChanged();
     void insertCompletion(const QString &completion);
 
 signals:

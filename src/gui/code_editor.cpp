@@ -27,7 +27,8 @@ CodeEditor::CodeEditor(QWidget *parent)
     // 连接信号槽
     connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &CodeEditor::updateRequest, this, &CodeEditor::updateLineNumberArea);
-    connect(this, &CodeEditor::cursorPositionChanged, this, &CodeEditor::highlightCurrentLine);
+    connect(this, &QPlainTextEdit::cursorPositionChanged, this, &CodeEditor::highlightCurrentLine);
+    connect(this, &QPlainTextEdit::cursorPositionChanged, this, &CodeEditor::onCursorPositionChanged);
     connect(this, &QPlainTextEdit::textChanged, this, &CodeEditor::onTextChanged);
     connect(m_changeTimer, &QTimer::timeout, this, [this]() {
         emit textChanged();
@@ -51,10 +52,14 @@ void CodeEditor::setupEditor()
     font.setPointSize(10);
     setFont(font);
     
-    // 设置制表符宽度
+    // 设置制表符宽度 - Qt6兼容性修复
     const int tabStop = 4;
     QFontMetrics metrics(font);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
     setTabStopDistance(tabStop * metrics.horizontalAdvance(' '));
+#else
+    setTabStopWidth(tabStop * metrics.width(' '));
+#endif
     
     // 设置当前行高亮格式
     m_currentLineFormat.setBackground(QColor(232, 232, 255));
@@ -143,12 +148,6 @@ void CodeEditor::highlightCurrentLine()
     }
 
     setExtraSelections(extraSelections);
-    
-    // 发送光标位置变化信号
-    QTextCursor cursor = textCursor();
-    int line = cursor.blockNumber() + 1;
-    int column = cursor.columnNumber() + 1;
-    emit cursorPositionChanged(line, column);
 }
 
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
@@ -252,6 +251,15 @@ void CodeEditor::onTextChanged()
     
     // 延迟触发分析
     m_changeTimer->start();
+}
+
+void CodeEditor::onCursorPositionChanged()
+{
+    // 发送带有行列号的光标位置变化信号
+    QTextCursor cursor = textCursor();
+    int line = cursor.blockNumber() + 1;
+    int column = cursor.columnNumber() + 1;
+    emit cursorPositionChanged(line, column);
 }
 
 void CodeEditor::insertCompletion(const QString &completion)

@@ -516,7 +516,8 @@ mainwindow.o: src/gui/mainwindow.cpp src/gui/mainwindow.h \
 		src/semantic/semantic_analyzer.h \
 		src/codegen/code_generator.h \
 		src/gui/find_replace_dialog.h \
-		src/gui/settings_dialog.h
+		src/gui/settings_dialog.h \
+		src/lexer/minimizer.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o mainwindow.o src/gui/mainwindow.cpp
 
 code_editor.o: src/gui/code_editor.cpp src/gui/code_editor.h
