@@ -962,33 +962,57 @@ void CodeGenerationPanel::setupCodeTable()
 
 void CodeGenerationPanel::setIntermediateCode(const QVector<ThreeAddressCode> &codes)
 {
-    Q_UNUSED(codes)
-    // 暂时使用演示数据，避免ThreeAddressCode的复制问题
-    codeTable->setRowCount(0);
+    codeTable->setRowCount(codes.size());
     
-    // 添加演示数据
-    QStringList demoInstructions = {
-        "LOAD|a||t1",
-        "LOAD|b||t2", 
-        "ADD|t1|t2|t3",
-        "STORE|t3||c",
-        "LOAD|c||t4",
-        "LOAD|5||t5",
-        "MUL|t4|t5|t6",
-        "STORE|t6||result"
-    };
-    
-    for (int i = 0; i < demoInstructions.size(); ++i) {
-        QStringList parts = demoInstructions[i].split('|');
-        if (parts.size() >= 4) {
-            codeTable->insertRow(i);
-            codeTable->setItem(i, 0, new QTableWidgetItem(QString::number(i + 1)));
-            codeTable->setItem(i, 1, new QTableWidgetItem(parts[0])); // 操作
-            codeTable->setItem(i, 2, new QTableWidgetItem(parts[1])); // 操作数1
-            codeTable->setItem(i, 3, new QTableWidgetItem(parts[2])); // 操作数2
-            codeTable->setItem(i, 4, new QTableWidgetItem(parts[3])); // 结果
+    for (int i = 0; i < codes.size(); ++i) {
+        const ThreeAddressCode& tac = codes[i];
+        
+        // 序号
+        QTableWidgetItem *indexItem = new QTableWidgetItem(QString::number(i + 1));
+        indexItem->setTextAlignment(Qt::AlignCenter);
+        codeTable->setItem(i, 0, indexItem);
+        
+        // 操作类型
+        QString opString = getOpTypeString(tac.op);
+        QTableWidgetItem *opItem = new QTableWidgetItem(opString);
+        codeTable->setItem(i, 1, opItem);
+        
+        // 操作数1
+        QString arg1String = "";
+        if (tac.arg1) {
+            arg1String = getOperandString(*tac.arg1);
+        }
+        QTableWidgetItem *arg1Item = new QTableWidgetItem(arg1String);
+        codeTable->setItem(i, 2, arg1Item);
+        
+        // 操作数2
+        QString arg2String = "";
+        if (tac.arg2) {
+            arg2String = getOperandString(*tac.arg2);
+        }
+        QTableWidgetItem *arg2Item = new QTableWidgetItem(arg2String);
+        codeTable->setItem(i, 3, arg2Item);
+        
+        // 结果
+        QString resultString = "";
+        if (tac.result) {
+            resultString = getOperandString(*tac.result);
+        }
+        QTableWidgetItem *resultItem = new QTableWidgetItem(resultString);
+        codeTable->setItem(i, 4, resultItem);
+        
+        // 设置行的工具提示为注释
+        if (!tac.comment.empty()) {
+            QString tooltip = QString::fromStdString(tac.comment);
+            for (int col = 0; col < 5; ++col) {
+                if (codeTable->item(i, col)) {
+                    codeTable->item(i, col)->setToolTip(tooltip);
+                }
+            }
         }
     }
+    
+    codeTable->resizeRowsToContents();
 }
 
 void CodeGenerationPanel::clearIntermediateCode()
@@ -1034,14 +1058,71 @@ void CodeGenerationPanel::updateCodeGenStatistics(int totalInstructions, int bas
 
 QString CodeGenerationPanel::getOpTypeString(OpType type)
 {
-    Q_UNUSED(type)
-    return "操作";
+    switch (type) {
+        case OpType::ADD: return "ADD";
+        case OpType::SUB: return "SUB";
+        case OpType::MUL: return "MUL";
+        case OpType::DIV: return "DIV";
+        case OpType::MOD: return "MOD";
+        case OpType::NEG: return "NEG";
+        case OpType::AND: return "AND";
+        case OpType::OR: return "OR";
+        case OpType::NOT: return "NOT";
+        case OpType::EQ: return "EQ";
+        case OpType::NE: return "NE";
+        case OpType::LT: return "LT";
+        case OpType::LE: return "LE";
+        case OpType::GT: return "GT";
+        case OpType::GE: return "GE";
+        case OpType::ASSIGN: return "ASSIGN";
+        case OpType::LOAD: return "LOAD";
+        case OpType::STORE: return "STORE";
+        case OpType::GOTO: return "GOTO";
+        case OpType::IF_FALSE: return "IF_FALSE";
+        case OpType::IF_TRUE: return "IF_TRUE";
+        case OpType::LABEL: return "LABEL";
+        case OpType::CALL: return "CALL";
+        case OpType::PARAM: return "PARAM";
+        case OpType::RETURN: return "RETURN";
+        case OpType::ARRAY_REF: return "ARRAY_REF";
+        case OpType::ARRAY_SET: return "ARRAY_SET";
+        case OpType::CAST: return "CAST";
+        case OpType::NOP: return "NOP";
+        default: return "UNKNOWN";
+    }
 }
 
 QString CodeGenerationPanel::getOperandString(const Operand &operand)
 {
-    Q_UNUSED(operand)
-    return "操作数";
+    QString result = QString::fromStdString(operand.name);
+    
+    // 如果是常量，显示值
+    if (operand.type == OperandType::CONSTANT) {
+        if (!operand.value.empty()) {
+            result = QString::fromStdString(operand.value);
+        }
+    }
+    
+    // 添加类型前缀
+    switch (operand.type) {
+        case OperandType::VARIABLE:
+            // 变量不需要前缀
+            break;
+        case OperandType::CONSTANT:
+            result = "#" + result;  // 常量前缀
+            break;
+        case OperandType::TEMPORARY:
+            result = "t" + result;  // 临时变量前缀
+            break;
+        case OperandType::LABEL:
+            result = "L" + result;  // 标签前缀
+            break;
+        case OperandType::FUNCTION:
+            result = "F" + result;  // 函数前缀
+            break;
+    }
+    
+    return result;
 }
 
 // ============ AnalysisPanel 实现 ============

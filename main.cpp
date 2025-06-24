@@ -40,6 +40,7 @@ int main(int argc, char *argv[])
     qRegisterMetaType<QVector<SemanticError>>("QVector<SemanticError>");
     qRegisterMetaType<SemanticError>("SemanticError");
     qRegisterMetaType<QVector<ThreeAddressCode>>("QVector<ThreeAddressCode>");
+    qRegisterMetaType<size_t>("size_t");  // 注册size_t类型
     
     qDebug() << "自定义类型注册完成";
     

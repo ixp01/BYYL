@@ -481,10 +481,14 @@ void AnalysisThread::run() {
                                 tac.result = std::make_unique<Operand>(OperandType::VARIABLE, var.toStdString(), IRDataType::INT);
                                 tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, val.toStdString(), val.toStdString(), IRDataType::INT);
                                 tac.comment = "变量声明并初始化";
+                                
+                                std::cout << "生成变量初始化指令: " << var.toStdString() << " = " << val.toStdString() << std::endl;
                             } else {
                                 tac.result = std::make_unique<Operand>(OperandType::VARIABLE, varName.toStdString(), IRDataType::INT);
                                 tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, "0", "0", IRDataType::INT);
                                 tac.comment = "变量声明";
+                                
+                                std::cout << "生成变量声明指令: " << varName.toStdString() << " = 0" << std::endl;
                             }
                             
                             intermediateCode.append(tac);
@@ -506,9 +510,16 @@ void AnalysisThread::run() {
                                     if (operands.size() >= 2) {
                                         tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, operands[0].trimmed().toStdString(), IRDataType::INT);
                                         tac.arg2 = std::make_unique<Operand>(OperandType::VARIABLE, operands[1].trimmed().toStdString(), IRDataType::INT);
+                                        
+                                        std::cout << "生成加法指令: " << parts[0].trimmed().toStdString() 
+                                                 << " = " << operands[0].trimmed().toStdString()
+                                                 << " + " << operands[1].trimmed().toStdString() << std::endl;
                                     }
                                 } else {
                                     tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, expr.toStdString(), IRDataType::INT);
+                                    
+                                    std::cout << "生成赋值指令: " << parts[0].trimmed().toStdString() 
+                                             << " = " << expr.toStdString() << std::endl;
                                 }
                                 tac.comment = "赋值操作";
                             }
@@ -524,6 +535,8 @@ void AnalysisThread::run() {
                             retValue = retValue.remove("return").remove(';').trimmed();
                             tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, retValue.toStdString(), IRDataType::INT);
                             tac.comment = "函数返回";
+                            
+                            std::cout << "生成返回指令: return " << retValue.toStdString() << std::endl;
                             
                             intermediateCode.append(tac);
                             instrCount++;
