@@ -28,7 +28,7 @@ CONFIG(release, debug|release) {
 }
 
 # 包含目录
-INCLUDEPATH += src/lexer src/parser src/semantic src/codegen src/gui src/utils
+INCLUDEPATH += src/lexer src/parser src/semantic src/codegen src/gui src/utils src/performance
 
 # 源文件
 SOURCES += \
@@ -49,7 +49,9 @@ SOURCES += \
     src/semantic/symbol_table.cpp \
     src/semantic/semantic_analyzer.cpp \
     src/codegen/intermediate_code.cpp \
-    src/codegen/code_generator.cpp
+    src/codegen/code_generator.cpp \
+    src/performance/performance_monitor.cpp \
+    src/performance/test_case_generator.cpp
 
 # 头文件
 HEADERS += \
@@ -69,7 +71,9 @@ HEADERS += \
     src/semantic/symbol_table.h \
     src/semantic/semantic_analyzer.h \
     src/codegen/intermediate_code.h \
-    src/codegen/code_generator.h
+    src/codegen/code_generator.h \
+    src/performance/performance_monitor.h \
+    src/performance/test_case_generator.h
 
 # 测试配置（可选编译）
 test {
