@@ -10,11 +10,29 @@
 #include <QSplitter>
 #include <QTabWidget>
 #include <QRegularExpression>
+#include <QDebug>
 
 // 简单的AST节点实现
 class SimpleASTNode : public ASTNode {
 public:
+    std::vector<std::shared_ptr<ASTNode>> children;
+    
     SimpleASTNode(ASTNodeType type, int line = 0, int col = 0) 
+        : ASTNode(type, line, col) {}
+    
+    void print(int indent = 0) const override {
+        printIndent(indent);
+        Q_UNUSED(indent)
+    }
+};
+
+// 详细的AST节点实现（包含具体值信息）
+class DetailedASTNode : public ASTNode {
+public:
+    std::string value;
+    std::vector<std::shared_ptr<ASTNode>> children;
+    
+    DetailedASTNode(ASTNodeType type, int line = 0, int col = 0) 
         : ASTNode(type, line, col) {}
     
     void print(int indent = 0) const override {
@@ -114,6 +132,7 @@ void LexicalAnalysisPanel::setupTokenTable()
 
 void LexicalAnalysisPanel::setTokens(const QVector<Token> &tokens)
 {
+    qDebug() << "LexicalAnalysisPanel::setTokens called with" << tokens.size() << "tokens";
     tokenTable->setRowCount(tokens.size());
     
     for (int i = 0; i < tokens.size(); ++i) {
@@ -145,6 +164,7 @@ void LexicalAnalysisPanel::setTokens(const QVector<Token> &tokens)
     }
     
     tokenTable->resizeRowsToContents();
+    qDebug() << "Token table updated successfully";
 }
 
 void LexicalAnalysisPanel::clearTokens()
@@ -384,82 +404,58 @@ void SyntaxAnalysisPanel::populateASTTree(QTreeWidgetItem *parent, const std::sh
     item->setText(0, getNodeTypeString(node->nodeType));
     item->setText(2, QString("第%1行").arg(node->line));
     
-    // 根据节点类型设置具体内容
-    QString nodeValue;
-    switch (node->nodeType) {
-        case ASTNodeType::PROGRAM:
-            nodeValue = "程序入口";
-            // 程序节点可能有子声明，但为了简化，我们创建一些示例子节点
-            if (!parent) { // 只在根级别创建子节点
-                auto funcChild = std::make_shared<SimpleASTNode>(ASTNodeType::FUNC_DECL, node->line + 1, 1);
-                populateASTTree(item, funcChild);
-            }
-            break;
-            
-        case ASTNodeType::FUNC_DECL:
-            nodeValue = "main()";
-            // 创建函数体
-            {
-                auto blockChild = std::make_shared<SimpleASTNode>(ASTNodeType::BLOCK_STMT, node->line + 1, 1);
-                populateASTTree(item, blockChild);
-            }
-            break;
-            
-        case ASTNodeType::VAR_DECL:
-            nodeValue = "int variable";
-            break;
-            
-        case ASTNodeType::BLOCK_STMT:
-            nodeValue = "{ ... }";
-            // 创建一些示例语句子节点
-            {
-                auto varChild = std::make_shared<SimpleASTNode>(ASTNodeType::VAR_DECL, node->line + 1, 1);
-                populateASTTree(item, varChild);
-                
-                auto assignChild = std::make_shared<SimpleASTNode>(ASTNodeType::ASSIGNMENT_STMT, node->line + 2, 1);
-                populateASTTree(item, assignChild);
-                
-                auto returnChild = std::make_shared<SimpleASTNode>(ASTNodeType::RETURN_STMT, node->line + 3, 1);
-                populateASTTree(item, returnChild);
-            }
-            break;
-            
-        case ASTNodeType::ASSIGNMENT_STMT:
-            nodeValue = "variable = expression";
-            // 创建左值和右值子节点
-            {
-                auto idChild = std::make_shared<SimpleASTNode>(ASTNodeType::IDENTIFIER_EXPR, node->line, 1);
-                populateASTTree(item, idChild);
-                
-                auto literalChild = std::make_shared<SimpleASTNode>(ASTNodeType::LITERAL_EXPR, node->line, 5);
-                populateASTTree(item, literalChild);
-            }
-            break;
-            
-        case ASTNodeType::RETURN_STMT:
-            nodeValue = "return expression";
-            // 创建返回值表达式子节点
-            {
-                auto exprChild = std::make_shared<SimpleASTNode>(ASTNodeType::LITERAL_EXPR, node->line, 8);
-                populateASTTree(item, exprChild);
-            }
-            break;
-            
-        case ASTNodeType::BINARY_EXPR:
-            nodeValue = "left op right";
-            break;
-            
-        case ASTNodeType::IDENTIFIER_EXPR:
-            nodeValue = "variable";
-            break;
-            
-        case ASTNodeType::LITERAL_EXPR:
-            nodeValue = "0";
-            break;
-            
-        default:
-            nodeValue = "节点内容";
-            break;
+    // 获取节点的具体值
+    QString nodeValue = "节点内容";
+    
+    // 尝试从DetailedASTNode获取具体值
+    if (auto detailedNode = dynamic_cast<DetailedASTNode*>(node.get())) {
+        if (!detailedNode->value.empty()) {
+            nodeValue = QString::fromStdString(detailedNode->value);
+        }
+        
+        // 递归显示子节点
+        for (const auto& child : detailedNode->children) {
+            populateASTTree(item, child);
+        }
+    } else if (auto simpleNode = dynamic_cast<SimpleASTNode*>(node.get())) {
+        // 处理SimpleASTNode的子节点
+        for (const auto& child : simpleNode->children) {
+            populateASTTree(item, child);
+        }
+        
+        // 根据节点类型设置默认值
+        switch (node->nodeType) {
+            case ASTNodeType::PROGRAM:
+                nodeValue = "程序入口";
+                break;
+            case ASTNodeType::FUNC_DECL:
+                nodeValue = "main()";
+                break;
+            case ASTNodeType::VAR_DECL:
+                nodeValue = "变量声明";
+                break;
+            case ASTNodeType::BLOCK_STMT:
+                nodeValue = "{ ... }";
+                break;
+            case ASTNodeType::ASSIGNMENT_STMT:
+                nodeValue = "赋值语句";
+                break;
+            case ASTNodeType::RETURN_STMT:
+                nodeValue = "return语句";
+                break;
+            case ASTNodeType::BINARY_EXPR:
+                nodeValue = "二元运算";
+                break;
+            case ASTNodeType::IDENTIFIER_EXPR:
+                nodeValue = "标识符";
+                break;
+            case ASTNodeType::LITERAL_EXPR:
+                nodeValue = "字面量";
+                break;
+            default:
+                nodeValue = "AST节点";
+                break;
+        }
     }
     
     item->setText(1, nodeValue);
@@ -665,49 +661,60 @@ void SemanticAnalysisPanel::setSymbolTableInfo(const QString &symbolTableInfo)
         }
         
         if (trimmedLine.startsWith("•")) {
-            // 这是一个符号条目，格式：• name (type): datatype
+            // 这是一个符号条目，格式：• name (type): datatype [行号:N]
             QString symbolLine = trimmedLine.mid(1).trimmed(); // 移除"•"
             
-            // 更简单的解析方式：按空格分割，然后提取信息
-            QStringList parts = symbolLine.split(QRegularExpression("\\s+"));
-            if (parts.size() >= 3) {
-                QString name = parts[0];
-                QString typeAndData = symbolLine.mid(name.length()).trimmed();
-                
-                // 提取类型和数据类型
-                QString type = "变量";
-                QString dataType = "int";
-                
-                if (typeAndData.contains("(variable)")) {
-                    type = "变量";
-                } else if (typeAndData.contains("(function)")) {
-                    type = "函数";
-                } else if (typeAndData.contains("(parameter)")) {
-                    type = "参数";
-                }
-                
-                // 提取数据类型
-                if (typeAndData.contains(": int")) {
-                    dataType = "int";
-                } else if (typeAndData.contains(": float")) {
-                    dataType = "float";
-                } else if (typeAndData.contains(": char")) {
-                    dataType = "char";
-                }
-                
-                QTreeWidgetItem *item = new QTreeWidgetItem();
-                item->setText(0, name);
-                item->setText(1, type);
-                item->setText(2, dataType);
-                item->setText(3, "0"); // 默认作用域
-                item->setText(4, "1"); // 默认行号
-                item->setText(5, "正常"); // 默认状态
-                
-                // 设置颜色
-                item->setForeground(0, QBrush(QColor(0, 128, 0))); // 绿色表示正常
-                
-                symbolTableTree->addTopLevelItem(item);
+            // 提取名称
+            int firstSpace = symbolLine.indexOf(' ');
+            if (firstSpace == -1) continue;
+            
+            QString name = symbolLine.left(firstSpace);
+            QString restOfLine = symbolLine.mid(firstSpace + 1).trimmed();
+            
+            // 提取类型信息，格式：(type): datatype [行号:N]
+            QString type = "变量";
+            QString dataType = "int";
+            QString lineNumber = "1";
+            
+            // 解析类型
+            if (restOfLine.contains("(variable)")) {
+                type = "变量";
+            } else if (restOfLine.contains("(function)")) {
+                type = "函数";
+            } else if (restOfLine.contains("(parameter)")) {
+                type = "参数";
             }
+            
+            // 解析数据类型
+            if (restOfLine.contains(": int")) {
+                dataType = "int";
+            } else if (restOfLine.contains(": float")) {
+                dataType = "float";
+            } else if (restOfLine.contains(": char")) {
+                dataType = "char";
+            } else if (restOfLine.contains(": void")) {
+                dataType = "void";
+            }
+            
+            // 解析行号，格式：[行号:N]
+            QRegularExpression lineRegex("\\[行号:(\\d+)\\]");
+            QRegularExpressionMatch lineMatch = lineRegex.match(restOfLine);
+            if (lineMatch.hasMatch()) {
+                lineNumber = lineMatch.captured(1);
+            }
+            
+            QTreeWidgetItem *item = new QTreeWidgetItem();
+            item->setText(0, name);
+            item->setText(1, type);
+            item->setText(2, dataType);
+            item->setText(3, "0"); // 默认作用域
+            item->setText(4, lineNumber); // 使用解析得到的行号
+            item->setText(5, "正常"); // 默认状态
+            
+            // 设置颜色
+            item->setForeground(0, QBrush(QColor(0, 128, 0))); // 绿色表示正常
+            
+            symbolTableTree->addTopLevelItem(item);
         }
     }
     

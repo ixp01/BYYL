@@ -60,6 +60,11 @@ std::map<TokenType, std::string> Token::typeStringMap = {
     {TokenType::MULTIPLY, "MULTIPLY"},
     {TokenType::DIVIDE, "DIVIDE"},
     {TokenType::MODULO, "MODULO"},
+    {TokenType::PLUS_ASSIGN, "PLUS_ASSIGN"},
+    {TokenType::MINUS_ASSIGN, "MINUS_ASSIGN"},
+    {TokenType::MUL_ASSIGN, "MUL_ASSIGN"},
+    {TokenType::DIV_ASSIGN, "DIV_ASSIGN"},
+    {TokenType::MOD_ASSIGN, "MOD_ASSIGN"},
     {TokenType::EQ, "EQ"},
     {TokenType::NE, "NE"},
     {TokenType::LT, "LT"},
@@ -95,7 +100,7 @@ bool Token::isKeyword() const {
 }
 
 bool Token::isOperator() const {
-    return (type >= TokenType::ASSIGN && type <= TokenType::MODULO) ||
+    return (type >= TokenType::ASSIGN && type <= TokenType::MOD_ASSIGN) ||
            (type >= TokenType::EQ && type <= TokenType::NOT);
 }
 

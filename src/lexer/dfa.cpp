@@ -9,10 +9,12 @@ DFAState::DFAState(int id, DFAStateType type, TokenType tokenType)
     : id(id), type(type), tokenType(tokenType) {
 }
 
+//新增转换函数
 void DFAState::addTransition(char c, int nextStateId) {
     transitions[c] = nextStateId;
 }
 
+//新增转换函数plus 给指定字添加转换关系
 void DFAState::addRangeTransition(char start, char end, int nextStateId) {
     for (char c = start; c <= end; ++c) {
         transitions[c] = nextStateId;
@@ -24,10 +26,12 @@ int DFAState::getNextState(char c) const {
     return (it != transitions.end()) ? it->second : -1;
 }
 
+//是否DFA类处于结束状态
 bool DFAState::isAccepting() const {
     return type == DFAStateType::ACCEPTING;
 }
 
+//打印DFAState类
 std::string DFAState::toString() const {
     std::stringstream ss;
     ss << "State " << id << " (" 
@@ -137,6 +141,7 @@ void DFA::addTransition(int fromState, char c, int toState) {
     }
 }
 
+//新增转换函数plus 给指定字符范围添加转换关系
 void DFA::addRangeTransition(int fromState, char start, char end, int toState) {
     if (fromState >= 0 && fromState < static_cast<int>(states.size()) &&
         toState >= 0 && toState < static_cast<int>(states.size())) {
@@ -162,10 +167,12 @@ void DFA::addStringTransition(int fromState, const std::string& str, int toState
     }
 }
 
+//重置DFA类
 void DFA::reset() {
     currentState = startState;
 }
 
+//处理字符
 bool DFA::processChar(char c) {
     if (currentState < 0 || currentState >= static_cast<int>(states.size())) {
         return false;
@@ -180,12 +187,14 @@ bool DFA::processChar(char c) {
     return true;
 }
 
+//是否在结束状态
 bool DFA::isInAcceptingState() const {
     return currentState >= 0 && 
            currentState < static_cast<int>(states.size()) &&
            states[currentState].isAccepting();
 }
 
+//获取当前token类型
 TokenType DFA::getCurrentTokenType() const {
     if (isInAcceptingState()) {
         return states[currentState].tokenType;
@@ -193,9 +202,11 @@ TokenType DFA::getCurrentTokenType() const {
     return TokenType::UNKNOWN;
 }
 
+//获取当前状态
 int DFA::getCurrentState() const {
     return currentState;
 }
+
 
 size_t DFA::getStateCount() const {
     return states.size();
@@ -261,25 +272,17 @@ std::pair<TokenType, std::string> DFA::recognizeToken(const std::string& input) 
 
 void DFA::buildIdentifierDFA() {
     // 标识符: [a-zA-Z_][a-zA-Z0-9_]*
+    // 修复：第一个字符读取后就应该能接受（支持单字符标识符）
     
-    // 状态1：识别标识符第一个字符（字母或下划线）
-    int identifierStart = addState(DFAStateType::NORMAL);
-    
-    // 状态2：标识符接受状态
+    // 状态1：标识符接受状态（第一个字符读取后立即可接受）
     int identifierAccept = addState(DFAStateType::ACCEPTING, TokenType::IDENTIFIER);
     
-    // 从起始状态到标识符开始状态
-    addRangeTransition(0, 'a', 'z', identifierStart);
-    addRangeTransition(0, 'A', 'Z', identifierStart);
-    addTransition(0, '_', identifierStart);
+    // 从起始状态到标识符接受状态（第一个字符）
+    addRangeTransition(0, 'a', 'z', identifierAccept);
+    addRangeTransition(0, 'A', 'Z', identifierAccept);
+    addTransition(0, '_', identifierAccept);
     
-    // 从标识符开始状态到接受状态
-    addRangeTransition(identifierStart, 'a', 'z', identifierAccept);
-    addRangeTransition(identifierStart, 'A', 'Z', identifierAccept);
-    addRangeTransition(identifierStart, '0', '9', identifierAccept);
-    addTransition(identifierStart, '_', identifierAccept);
-    
-    // 标识符接受状态的自循环
+    // 标识符接受状态的自循环（继续读取后续字符）
     addRangeTransition(identifierAccept, 'a', 'z', identifierAccept);
     addRangeTransition(identifierAccept, 'A', 'Z', identifierAccept);
     addRangeTransition(identifierAccept, '0', '9', identifierAccept);
@@ -332,6 +335,13 @@ void DFA::buildOperatorDFA() {
     int ltState = addState(DFAStateType::ACCEPTING, TokenType::LT);
     int gtState = addState(DFAStateType::ACCEPTING, TokenType::GT);
     
+    // 复合赋值运算符
+    int plusAssignState = addState(DFAStateType::ACCEPTING, TokenType::PLUS_ASSIGN);
+    int minusAssignState = addState(DFAStateType::ACCEPTING, TokenType::MINUS_ASSIGN);
+    int mulAssignState = addState(DFAStateType::ACCEPTING, TokenType::MUL_ASSIGN);
+    int divAssignState = addState(DFAStateType::ACCEPTING, TokenType::DIV_ASSIGN);
+    int modAssignState = addState(DFAStateType::ACCEPTING, TokenType::MOD_ASSIGN);
+    
     // 单字符运算符转换
     addTransition(0, '+', plusState);
     addTransition(0, '-', minusState);
@@ -344,6 +354,13 @@ void DFA::buildOperatorDFA() {
     
     // 双字符运算符转换
     addTransition(assignState, '=', eqState);  // ==
+    
+    // 复合赋值运算符转换
+    addTransition(plusState, '=', plusAssignState);    // +=
+    addTransition(minusState, '=', minusAssignState);  // -=
+    addTransition(multiplyState, '=', mulAssignState); // *=
+    addTransition(divideState, '=', divAssignState);   // /=
+    addTransition(moduloState, '=', modAssignState);   // %=
     
     int notState = addState(DFAStateType::NORMAL);
     addTransition(0, '!', notState);

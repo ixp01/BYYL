@@ -45,7 +45,25 @@ class AnalysisPanel;
 // 简单的AST节点实现（具体类，可以实例化）
 class SimpleASTNode : public ASTNode {
 public:
+    std::vector<std::shared_ptr<ASTNode>> children;
+    
     SimpleASTNode(ASTNodeType type, int line = 0, int col = 0) 
+        : ASTNode(type, line, col) {}
+    
+    void print(int indent = 0) const override {
+        printIndent(indent);
+        // 简化实现，不依赖iostream
+        Q_UNUSED(indent)
+    }
+};
+
+// 详细的AST节点实现（包含具体值信息）
+class DetailedASTNode : public ASTNode {
+public:
+    std::string value;
+    std::vector<std::shared_ptr<ASTNode>> children;
+    
+    DetailedASTNode(ASTNodeType type, int line = 0, int col = 0) 
         : ASTNode(type, line, col) {}
     
     void print(int indent = 0) const override {
@@ -105,11 +123,40 @@ private:
     QMutex m_mutex;
     AnalysisType m_analysisType;
     
+    // 解析器相关成员变量
+    std::vector<Token> m_tokens;
+    size_t TokenIndex;
+    
     // 辅助方法
     std::shared_ptr<ASTNode> createSimpleParser();
     std::shared_ptr<ASTNode> parseTokensToAST(const std::vector<Token>& tokens);
     int countASTNodes(ASTNode* node);
     int getASTDepth(ASTNode* node);
+    
+    // 递归下降解析器方法
+    std::shared_ptr<ASTNode> parseProgram();
+    std::shared_ptr<ASTNode> parseDeclaration();
+    std::shared_ptr<ASTNode> parseStatement();
+    std::shared_ptr<ASTNode> parseReturnStatement();
+    std::shared_ptr<ASTNode> parseExpression();
+    std::shared_ptr<ASTNode> parseAdditiveExpression();
+    std::shared_ptr<ASTNode> parseMultiplicativeExpression();
+    std::shared_ptr<ASTNode> parsePrimaryExpression();
+    
+    // 新增的解析方法
+    std::shared_ptr<ASTNode> parseIfStatement();
+    std::shared_ptr<ASTNode> parseBlockStatement();
+    std::shared_ptr<ASTNode> parseComparisonExpression();
+    
+    // 解析器辅助方法
+    Token currentToken() const;
+    void advance();
+    bool isTypeKeyword(TokenType type) const;
+    std::string getTypeString(TokenType type) const;
+    
+    // 代码生成方法
+    bool generateCodeFromAST(ASTNode* node, QVector<ThreeAddressCode>& intermediateCode, int& instrCount);
+    bool generateCodeFromString(const QString& code, QVector<ThreeAddressCode>& intermediateCode, int& instrCount);
 };
 
 /**

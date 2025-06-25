@@ -63,6 +63,7 @@ std::string ThreeAddressCode::getOpString() const {
         case OpType::SUB: return "-";
         case OpType::MUL: return "*";
         case OpType::DIV: return "/";
+        case OpType::MOD: return "%";
         case OpType::ASSIGN: return "=";
         default: return "?";
     }
@@ -151,6 +152,20 @@ void IntermediateCode::constantFolding() {
                 case OpType::ADD: result = val1 + val2; break;
                 case OpType::SUB: result = val1 - val2; break;
                 case OpType::MUL: result = val1 * val2; break;
+                case OpType::DIV: 
+                    if (val2 != 0) {
+                        result = val1 / val2; 
+                    } else {
+                        canFold = false; // 避免除零
+                    }
+                    break;
+                case OpType::MOD: 
+                    if (val2 != 0) {
+                        result = val1 % val2; 
+                    } else {
+                        canFold = false; // 避免除零
+                    }
+                    break;
                 default: canFold = false; break;
             }
             

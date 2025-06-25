@@ -37,10 +37,19 @@ enum class OpType {
     LOAD,       // result = *arg1 (从内存加载)
     STORE,      // *result = arg1 (存储到内存)
     
+    // 地址操作
+    ADDR,       // result = &arg1 (取地址)
+    
     // 控制流
     GOTO,       // goto label
     IF_FALSE,   // if (!arg1) goto label
     IF_TRUE,    // if (arg1) goto label
+    IF_EQ,      // if (arg1 == arg2) goto label
+    IF_NE,      // if (arg1 != arg2) goto label
+    IF_LT,      // if (arg1 < arg2) goto label
+    IF_LE,      // if (arg1 <= arg2) goto label
+    IF_GT,      // if (arg1 > arg2) goto label
+    IF_GE,      // if (arg1 >= arg2) goto label
     LABEL,      // label:
     
     // 函数相关

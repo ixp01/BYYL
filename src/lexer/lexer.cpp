@@ -353,11 +353,36 @@ Token Lexer::scanOperator() {
     char next = peek();
     
     switch (c) {
-        case '+': return Token(TokenType::PLUS, "+", startLine, startColumn);
-        case '-': return Token(TokenType::MINUS, "-", startLine, startColumn);
-        case '*': return Token(TokenType::MULTIPLY, "*", startLine, startColumn);
-        case '/': return Token(TokenType::DIVIDE, "/", startLine, startColumn);
-        case '%': return Token(TokenType::MODULO, "%", startLine, startColumn);
+        case '+':
+            if (next == '=') {
+                advance();
+                return Token(TokenType::PLUS_ASSIGN, "+=", startLine, startColumn);
+            }
+            return Token(TokenType::PLUS, "+", startLine, startColumn);
+        case '-':
+            if (next == '=') {
+                advance();
+                return Token(TokenType::MINUS_ASSIGN, "-=", startLine, startColumn);
+            }
+            return Token(TokenType::MINUS, "-", startLine, startColumn);
+        case '*':
+            if (next == '=') {
+                advance();
+                return Token(TokenType::MUL_ASSIGN, "*=", startLine, startColumn);
+            }
+            return Token(TokenType::MULTIPLY, "*", startLine, startColumn);
+        case '/':
+            if (next == '=') {
+                advance();
+                return Token(TokenType::DIV_ASSIGN, "/=", startLine, startColumn);
+            }
+            return Token(TokenType::DIVIDE, "/", startLine, startColumn);
+        case '%':
+            if (next == '=') {
+                advance();
+                return Token(TokenType::MOD_ASSIGN, "%=", startLine, startColumn);
+            }
+            return Token(TokenType::MODULO, "%", startLine, startColumn);
         case '=':
             if (next == '=') {
                 advance();

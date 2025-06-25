@@ -28,6 +28,11 @@ enum class ASTNodeType {
     RETURN_STMT,        // return语句
     BREAK_STMT,         // break语句
     CONTINUE_STMT,      // continue语句
+    GOTO_STMT,          // goto语句
+    LABEL_STMT,         // 标签语句
+    SWITCH_STMT,        // switch语句
+    CASE_STMT,          // case语句
+    DO_WHILE_STMT,      // do-while语句
     
     // 声明节点
     VAR_DECL,           // 变量声明
@@ -82,6 +87,9 @@ public:
     StmtNode(ASTNodeType type, int l = 0, int c = 0) 
         : ASTNode(type, l, c) {}
 };
+
+// 前向声明
+class CaseStmtNode;
 
 /**
  * @brief 二元表达式节点
@@ -147,9 +155,11 @@ class AssignmentStmtNode : public StmtNode {
 public:
     std::unique_ptr<ExprNode> lvalue;
     std::unique_ptr<ExprNode> rvalue;
+    TokenType assignmentOperator;  // 赋值运算符类型 (=, +=, -=, *=, /=, %=)
     
     AssignmentStmtNode(std::unique_ptr<ExprNode> lval,
                        std::unique_ptr<ExprNode> rval,
+                       TokenType assignOp = TokenType::ASSIGN,
                        int line = 0, int col = 0);
     
     void print(int indent = 0) const override;
@@ -223,6 +233,117 @@ public:
     ExpressionStmtNode(std::unique_ptr<ExprNode> expr,
                        int line = 0, int col = 0);
     
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief for语句节点
+ */
+class ForStmtNode : public StmtNode {
+public:
+    std::unique_ptr<StmtNode> init;        // 初始化语句
+    std::unique_ptr<ExprNode> condition;   // 条件表达式
+    std::unique_ptr<ExprNode> update;      // 更新表达式
+    std::unique_ptr<StmtNode> body;        // 循环体
+    
+    ForStmtNode(std::unique_ptr<StmtNode> init_stmt,
+                std::unique_ptr<ExprNode> cond,
+                std::unique_ptr<ExprNode> update_expr,
+                std::unique_ptr<StmtNode> body_stmt,
+                int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief do-while语句节点
+ */
+class DoWhileStmtNode : public StmtNode {
+public:
+    std::unique_ptr<StmtNode> body;        // 循环体
+    std::unique_ptr<ExprNode> condition;   // 条件表达式
+    
+    DoWhileStmtNode(std::unique_ptr<StmtNode> body_stmt,
+                    std::unique_ptr<ExprNode> cond,
+                    int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief break语句节点
+ */
+class BreakStmtNode : public StmtNode {
+public:
+    BreakStmtNode(int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief continue语句节点
+ */
+class ContinueStmtNode : public StmtNode {
+public:
+    ContinueStmtNode(int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief goto语句节点
+ */
+class GotoStmtNode : public StmtNode {
+public:
+    std::string label;  // 目标标签
+    
+    GotoStmtNode(const std::string& target_label, int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief 标签语句节点
+ */
+class LabelStmtNode : public StmtNode {
+public:
+    std::string label;                     // 标签名
+    std::unique_ptr<StmtNode> statement;   // 可选的语句
+    
+    LabelStmtNode(const std::string& label_name,
+                  std::unique_ptr<StmtNode> stmt = nullptr,
+                  int line = 0, int col = 0);
+    
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief switch语句节点
+ */
+class SwitchStmtNode : public StmtNode {
+public:
+    std::unique_ptr<ExprNode> expression;           // switch表达式
+    std::vector<std::unique_ptr<CaseStmtNode>> cases;  // case列表
+    std::unique_ptr<StmtNode> defaultCase;          // default语句(可选)
+    
+    SwitchStmtNode(std::unique_ptr<ExprNode> expr, int line = 0, int col = 0);
+    
+    void addCase(std::unique_ptr<CaseStmtNode> case_stmt);
+    void setDefault(std::unique_ptr<StmtNode> default_stmt);
+    void print(int indent = 0) const override;
+};
+
+/**
+ * @brief case语句节点
+ */
+class CaseStmtNode : public StmtNode {
+public:
+    std::unique_ptr<ExprNode> value;               // case值
+    std::vector<std::unique_ptr<StmtNode>> statements;  // case语句列表
+    
+    CaseStmtNode(std::unique_ptr<ExprNode> case_value, int line = 0, int col = 0);
+    
+    void addStatement(std::unique_ptr<StmtNode> stmt);
     void print(int indent = 0) const override;
 };
 

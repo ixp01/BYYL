@@ -36,6 +36,11 @@ enum class TokenType {
     MULTIPLY,       // *
     DIVIDE,         // /
     MODULO,         // %
+    PLUS_ASSIGN,    // +=
+    MINUS_ASSIGN,   // -=
+    MUL_ASSIGN,     // *=
+    DIV_ASSIGN,     // /=
+    MOD_ASSIGN,     // %=
     
     // 比较运算符
     EQ,             // ==

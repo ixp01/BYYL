@@ -495,23 +495,51 @@ Grammar Grammar::buildSimpleExpressionGrammar() {
     // 添加终结符
     grammar.addTerminal("id", TokenType::IDENTIFIER);
     grammar.addTerminal("num", TokenType::NUMBER);
+    grammar.addTerminal("=", TokenType::ASSIGN);
+    grammar.addTerminal("+=", TokenType::PLUS_ASSIGN);
+    grammar.addTerminal("-=", TokenType::MINUS_ASSIGN);
+    grammar.addTerminal("*=", TokenType::MUL_ASSIGN);
+    grammar.addTerminal("/=", TokenType::DIV_ASSIGN);
+    grammar.addTerminal("%=", TokenType::MOD_ASSIGN);
     grammar.addTerminal("+", TokenType::PLUS);
+    grammar.addTerminal("-", TokenType::MINUS);
     grammar.addTerminal("*", TokenType::MULTIPLY);
+    grammar.addTerminal("/", TokenType::DIVIDE);
+    grammar.addTerminal("%", TokenType::MODULO);
     grammar.addTerminal("(", TokenType::LPAREN);
     grammar.addTerminal(")", TokenType::RPAREN);
+    grammar.addTerminal(";", TokenType::SEMICOLON);
     
     // 添加非终结符
-    grammar.addNonTerminal("E");
-    grammar.addNonTerminal("T");
-    grammar.addNonTerminal("F");
+    grammar.addNonTerminal("S");  // 语句
+    grammar.addNonTerminal("A");  // 赋值语句
+    grammar.addNonTerminal("E");  // 表达式
+    grammar.addNonTerminal("T");  // 乘除项
+    grammar.addNonTerminal("F");  // 因子
     
     // 添加产生式
-    // E -> E + T | T
+    // S -> A ; | A
+    grammar.addProduction("S", {"A", ";"});
+    grammar.addProduction("S", {"A"});
+    
+    // A -> id = E | id += E | id -= E | id *= E | id /= E | id %= E | E
+    grammar.addProduction("A", {"id", "=", "E"});
+    grammar.addProduction("A", {"id", "+=", "E"});
+    grammar.addProduction("A", {"id", "-=", "E"});
+    grammar.addProduction("A", {"id", "*=", "E"});
+    grammar.addProduction("A", {"id", "/=", "E"});
+    grammar.addProduction("A", {"id", "%=", "E"});
+    grammar.addProduction("A", {"E"});
+    
+    // E -> E + T | E - T | T
     grammar.addProduction("E", {"E", "+", "T"});
+    grammar.addProduction("E", {"E", "-", "T"});
     grammar.addProduction("E", {"T"});
     
-    // T -> T * F | F
+    // T -> T * F | T / F | T % F | F
     grammar.addProduction("T", {"T", "*", "F"});
+    grammar.addProduction("T", {"T", "/", "F"});
+    grammar.addProduction("T", {"T", "%", "F"});
     grammar.addProduction("T", {"F"});
     
     // F -> (E) | id | num
@@ -519,7 +547,7 @@ Grammar Grammar::buildSimpleExpressionGrammar() {
     grammar.addProduction("F", {"id"});
     grammar.addProduction("F", {"num"});
     
-    grammar.setStartSymbol("E");
+    grammar.setStartSymbol("S");
     
     return grammar;
 }

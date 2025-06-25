@@ -325,13 +325,14 @@ Grammar ParserFactory::buildArithmeticGrammar() {
     
     // 构建算术表达式文法
     // E -> E + T | E - T | T
-    // T -> T * F | T / F | F
+    // T -> T * F | T / F | T % F | F
     // F -> (E) | number | id
     
     grammar.addTerminal("+", TokenType::PLUS);
     grammar.addTerminal("-", TokenType::MINUS);
     grammar.addTerminal("*", TokenType::MULTIPLY);
     grammar.addTerminal("/", TokenType::DIVIDE);
+    grammar.addTerminal("%", TokenType::MODULO);
     grammar.addTerminal("(", TokenType::LPAREN);
     grammar.addTerminal(")", TokenType::RPAREN);
     grammar.addTerminal("number", TokenType::NUMBER);
@@ -347,6 +348,7 @@ Grammar ParserFactory::buildArithmeticGrammar() {
     
     grammar.addProduction("T", {"T", "*", "F"});
     grammar.addProduction("T", {"T", "/", "F"});
+    grammar.addProduction("T", {"T", "%", "F"});
     grammar.addProduction("T", {"F"});
     
     grammar.addProduction("F", {"(", "E", ")"});

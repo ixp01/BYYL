@@ -85,13 +85,14 @@ void LiteralNode::print(int indent) const {
 
 // AssignmentStmtNode赋值语句节点实现
 AssignmentStmtNode::AssignmentStmtNode(std::unique_ptr<ExprNode> lval, 
-                                       std::unique_ptr<ExprNode> rval, int line, int col)
+                                       std::unique_ptr<ExprNode> rval, 
+                                       TokenType assignOp, int line, int col)
     : StmtNode(ASTNodeType::ASSIGNMENT_STMT, line, col), 
-      lvalue(std::move(lval)), rvalue(std::move(rval)) {}
+      lvalue(std::move(lval)), rvalue(std::move(rval)), assignmentOperator(assignOp) {}
 
 void AssignmentStmtNode::print(int indent) const {
     printIndent(indent);
-    std::cout << "AssignmentStmt\n";
+    std::cout << "AssignmentStmt(" << Token::getTypeString(assignmentOperator) << ")\n";
     
     if (lvalue) {
         printIndent(indent + 1);
@@ -285,6 +286,178 @@ void ProgramNode::print(int indent) const {
     for (const auto& decl : declarations) {
         if (decl) {
             decl->print(indent + 1);
+        }
+    }
+}
+
+// ForStmtNode for语句节点实现
+ForStmtNode::ForStmtNode(std::unique_ptr<StmtNode> init_stmt,
+                         std::unique_ptr<ExprNode> cond,
+                         std::unique_ptr<ExprNode> update_expr,
+                         std::unique_ptr<StmtNode> body_stmt,
+                         int line, int col)
+    : StmtNode(ASTNodeType::FOR_STMT, line, col),
+      init(std::move(init_stmt)), condition(std::move(cond)),
+      update(std::move(update_expr)), body(std::move(body_stmt)) {}
+
+void ForStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "ForStmt\n";
+    
+    if (init) {
+        printIndent(indent + 1);
+        std::cout << "Init:\n";
+        init->print(indent + 2);
+    }
+    
+    if (condition) {
+        printIndent(indent + 1);
+        std::cout << "Condition:\n";
+        condition->print(indent + 2);
+    }
+    
+    if (update) {
+        printIndent(indent + 1);
+        std::cout << "Update:\n";
+        update->print(indent + 2);
+    }
+    
+    if (body) {
+        printIndent(indent + 1);
+        std::cout << "Body:\n";
+        body->print(indent + 2);
+    }
+}
+
+// DoWhileStmtNode do-while语句节点实现
+DoWhileStmtNode::DoWhileStmtNode(std::unique_ptr<StmtNode> body_stmt,
+                                 std::unique_ptr<ExprNode> cond,
+                                 int line, int col)
+    : StmtNode(ASTNodeType::DO_WHILE_STMT, line, col),
+      body(std::move(body_stmt)), condition(std::move(cond)) {}
+
+void DoWhileStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "DoWhileStmt\n";
+    
+    if (body) {
+        printIndent(indent + 1);
+        std::cout << "Body:\n";
+        body->print(indent + 2);
+    }
+    
+    if (condition) {
+        printIndent(indent + 1);
+        std::cout << "Condition:\n";
+        condition->print(indent + 2);
+    }
+}
+
+// BreakStmtNode break语句节点实现
+BreakStmtNode::BreakStmtNode(int line, int col)
+    : StmtNode(ASTNodeType::BREAK_STMT, line, col) {}
+
+void BreakStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "BreakStmt\n";
+}
+
+// ContinueStmtNode continue语句节点实现
+ContinueStmtNode::ContinueStmtNode(int line, int col)
+    : StmtNode(ASTNodeType::CONTINUE_STMT, line, col) {}
+
+void ContinueStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "ContinueStmt\n";
+}
+
+// GotoStmtNode goto语句节点实现
+GotoStmtNode::GotoStmtNode(const std::string& target_label, int line, int col)
+    : StmtNode(ASTNodeType::GOTO_STMT, line, col), label(target_label) {}
+
+void GotoStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "GotoStmt(label: " << label << ")\n";
+}
+
+// LabelStmtNode 标签语句节点实现
+LabelStmtNode::LabelStmtNode(const std::string& label_name,
+                             std::unique_ptr<StmtNode> stmt,
+                             int line, int col)
+    : StmtNode(ASTNodeType::LABEL_STMT, line, col),
+      label(label_name), statement(std::move(stmt)) {}
+
+void LabelStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "LabelStmt(label: " << label << ")\n";
+    
+    if (statement) {
+        printIndent(indent + 1);
+        std::cout << "Statement:\n";
+        statement->print(indent + 2);
+    }
+}
+
+// SwitchStmtNode switch语句节点实现
+SwitchStmtNode::SwitchStmtNode(std::unique_ptr<ExprNode> expr, int line, int col)
+    : StmtNode(ASTNodeType::SWITCH_STMT, line, col), expression(std::move(expr)) {}
+
+void SwitchStmtNode::addCase(std::unique_ptr<CaseStmtNode> case_stmt) {
+    cases.push_back(std::move(case_stmt));
+}
+
+void SwitchStmtNode::setDefault(std::unique_ptr<StmtNode> default_stmt) {
+    defaultCase = std::move(default_stmt);
+}
+
+void SwitchStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "SwitchStmt\n";
+    
+    if (expression) {
+        printIndent(indent + 1);
+        std::cout << "Expression:\n";
+        expression->print(indent + 2);
+    }
+    
+    printIndent(indent + 1);
+    std::cout << "Cases (" << cases.size() << "):\n";
+    for (const auto& case_stmt : cases) {
+        if (case_stmt) {
+            case_stmt->print(indent + 2);
+        }
+    }
+    
+    if (defaultCase) {
+        printIndent(indent + 1);
+        std::cout << "Default:\n";
+        defaultCase->print(indent + 2);
+    }
+}
+
+// CaseStmtNode case语句节点实现
+CaseStmtNode::CaseStmtNode(std::unique_ptr<ExprNode> case_value, int line, int col)
+    : StmtNode(ASTNodeType::CASE_STMT, line, col), value(std::move(case_value)) {}
+
+void CaseStmtNode::addStatement(std::unique_ptr<StmtNode> stmt) {
+    statements.push_back(std::move(stmt));
+}
+
+void CaseStmtNode::print(int indent) const {
+    printIndent(indent);
+    std::cout << "CaseStmt\n";
+    
+    if (value) {
+        printIndent(indent + 1);
+        std::cout << "Value:\n";
+        value->print(indent + 2);
+    }
+    
+    printIndent(indent + 1);
+    std::cout << "Statements (" << statements.size() << "):\n";
+    for (const auto& stmt : statements) {
+        if (stmt) {
+            stmt->print(indent + 2);
         }
     }
 } 

@@ -356,13 +356,7 @@ gdb ./CompilerFrontend
 - 编译原理经典教材《龙书》的理论指导
 - 开源社区的宝贵贡献和反馈
 
-## 📞 联系方式
 
-如有问题或建议，请通过以下方式联系：
-
-- 📧 Email: [your-email@example.com]
-- 🐛 Issues: [GitHub Issues](https://github.com/ixp01/BYYL/issues)
-- 📖 Wiki: [项目Wiki](https://github.com/ixp01/BYYL/wiki)
 
 ---
 

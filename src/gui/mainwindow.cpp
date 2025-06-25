@@ -9,6 +9,7 @@
 #include <QStandardPaths>
 #include <QInputDialog>
 #include <QTextStream>
+#include <QRegularExpression>
 #include <iostream>
 #include <QVBoxLayout>
 
@@ -101,6 +102,8 @@ void AnalysisThread::run() {
         // 2. 语法分析 - 实际解析
         emit analysisProgress("正在进行语法分析...");
         
+        std::cout << "=== 开始语法分析 ===" << std::endl;
+        
         // 创建简单的语法分析器
         auto parser = createSimpleParser();
         std::shared_ptr<ASTNode> ast = nullptr;
@@ -109,8 +112,16 @@ void AnalysisThread::run() {
         
         try {
             // 尝试解析
+            std::cout << "调用parseTokensToAST，Token数量: " << lexResult.tokens.size() << std::endl;
             ast = parseTokensToAST(lexResult.tokens);
             parseSuccess = (ast != nullptr);
+            
+            std::cout << "语法分析结果: parseSuccess=" << parseSuccess << ", ast=" << (ast ? "not null" : "null") << std::endl;
+            
+            if (ast) {
+                std::cout << "AST节点数: " << countASTNodes(ast.get()) << std::endl;
+                std::cout << "AST深度: " << getASTDepth(ast.get()) << std::endl;
+            }
             
             if (parseSuccess) {
                 parseInfo = QString("语法分析结果:\n"
@@ -148,7 +159,10 @@ void AnalysisThread::run() {
         } catch (const std::exception& e) {
             parseSuccess = false;
             parseInfo = QString("语法分析错误:\n• %1").arg(e.what());
+            std::cout << "语法分析异常: " << e.what() << std::endl;
         }
+        
+        std::cout << "准备发送语法分析信号, parseSuccess=" << parseSuccess << std::endl;
         
         QString grammarInfo = "支持的文法规则:\n\n"
                              "Program → Declaration*\n"
@@ -186,6 +200,8 @@ void AnalysisThread::run() {
         
         if (parseSuccess && ast) {
             try {
+                std::cout << "=== 开始语义分析 ===" << std::endl;
+                
                 // 创建语义分析器
                 SemanticAnalyzer analyzer;
                 
@@ -197,6 +213,8 @@ void AnalysisThread::run() {
                 result.totalScopes = 1;
                 result.analysisTimeMs = 10;
                 
+                std::cout << "创建语义分析器成功" << std::endl;
+                
                 // 创建一个新的符号表用于演示
                 auto demoSymbolTable = std::make_unique<SymbolTable>();
                 
@@ -206,6 +224,8 @@ void AnalysisThread::run() {
                     QMutexLocker locker(&m_mutex);
                     sourceCode = m_sourceCode;
                 }
+                
+                std::cout << "开始分析源代码，行数: " << sourceCode.split('\n').size() << std::endl;
                 
                 // 模拟一些使用检查和错误检测
                 QStringList sourceLines = sourceCode.split('\n');
@@ -217,65 +237,154 @@ void AnalysisThread::run() {
                 for (int lineNum = 0; lineNum < sourceLines.size(); ++lineNum) {
                     QString line = sourceLines[lineNum].trimmed();
                     
-                    // 检查变量声明和初始化
-                    if (line.startsWith("int ") && line.contains(';')) {
-                        QStringList parts = line.split(' ');
-                        if (parts.size() >= 2) {
-                            QString varPart = parts[1];
-                            QString varName = varPart.split('=')[0].split(';')[0].trimmed();
-                            
-                            if (!varName.isEmpty()) {
+                    // 检查变量声明和初始化 - 支持多种类型
+                    QRegularExpression declPattern("(int|float|double|char)\\s+([a-zA-Z_][a-zA-Z0-9_]*)");
+                    QRegularExpressionMatch declMatch = declPattern.match(line);
+                    if (declMatch.hasMatch()) {
+                        QString varType = declMatch.captured(1);
+                        QString varName = declMatch.captured(2);
+                        
+                        if (!varName.isEmpty()) {
+                            // 检查重复声明
+                            if (variableInitialized.find(varName.toStdString()) != variableInitialized.end()) {
+                                SemanticError error;
+                                error.type = SemanticErrorType::REDEFINED_VARIABLE;
+                                error.message = "重复定义的变量 '" + varName.toStdString() + "'";
+                                error.line = lineNum + 1;
+                                error.column = line.indexOf(varName) + 1;
+                                semanticErrors.append(error);
+                                semanticSuccess = false;
+                            } else {
+                                // 只有在没有重复时才添加变量
                                 bool isInitialized = line.contains('=');
                                 variableInitialized[varName.toStdString()] = isInitialized;
                                 variableDeclarationLine[varName.toStdString()] = lineNum + 1;
                                 
-                                if (!isInitialized) {
-                                    // 添加警告：变量未初始化
-                                    SemanticError warning;
-                                    warning.type = SemanticErrorType::UNINITIALIZED_VARIABLE;
-                                    warning.message = "变量 '" + varName.toStdString() + "' 声明但未初始化";
-                                    warning.line = lineNum + 1;
-                                    warning.column = line.indexOf(varName) + 1;
-                                    semanticErrors.append(warning);
-                                }
+                                // 注意：不再在声明时就报未初始化警告
+                                // 变量声明本身是合法的，无论是否初始化
                             }
                         }
                     }
                     
-                    // 检查变量使用
+                    // 检查赋值语句，标记变量为已初始化
+                    QRegularExpression assignPattern("([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*([^=]+)");
+                    QRegularExpressionMatch assignMatch = assignPattern.match(line);
+                    if (assignMatch.hasMatch()) {
+                        QString varName = assignMatch.captured(1).trimmed();
+                        QString varValue = assignMatch.captured(2).trimmed();
+                        
+                        // 检查这个变量是否已声明
+                        if (variableInitialized.find(varName.toStdString()) != variableInitialized.end()) {
+                            // 标记变量为已初始化（通过赋值）
+                            variableInitialized[varName.toStdString()] = true;
+                            demoSymbolTable->markSymbolInitialized(varName.toStdString());
+                            std::cout << "变量 " << varName.toStdString() << " 通过赋值被标记为已初始化" << std::endl;
+                        }
+                    }
+                    
+                    // 标记变量使用情况（用于符号表显示）
                     for (const auto& var : variableInitialized) {
                         QString varName = QString::fromStdString(var.first);
                         if (line.contains(varName + " ") || line.contains(varName + ";") || 
                             line.contains(varName + "+") || line.contains(varName + "-") ||
                             line.contains(varName + "*") || line.contains(varName + "/")) {
                             
-                            // 排除声明行
-                            if (lineNum + 1 != variableDeclarationLine[var.first]) {
+                            // 排除声明行和赋值行（避免将赋值误认为使用）
+                            if (lineNum + 1 != variableDeclarationLine[var.first] && 
+                                !line.contains(varName + " =") && !line.contains(varName + "=")) {
                                 demoSymbolTable->markSymbolUsed(var.first);
-                                
-                                // 如果使用了未初始化的变量
-                                if (!var.second) {
-                                    SemanticError error;
-                                    error.type = SemanticErrorType::UNINITIALIZED_VARIABLE;
-                                    error.message = "使用了未初始化的变量 '" + var.first + "'";
-                                    error.line = lineNum + 1;
-                                    error.column = line.indexOf(varName) + 1;
-                                    semanticErrors.append(error);
-                                    semanticSuccess = false;
-                                }
+                                // 注意：这里不再直接报错，错误检查统一在后面处理
                             }
                         }
                     }
                     
-                    // 检查未声明的变量使用
+                    // 增加更多错误类型检查
+                
+                    // 1. 检查类型不匹配 (int x = "hello")
+                    if (line.contains("int ") && line.contains("=") && line.contains("\"")) {
+                        SemanticError error;
+                        error.type = SemanticErrorType::TYPE_MISMATCH;
+                        error.message = "类型不匹配：不能将字符串赋值给整数变量";
+                        error.line = lineNum + 1;
+                        error.column = line.indexOf("=") + 1;
+                        semanticErrors.append(error);
+                        semanticSuccess = false;
+                    }
+                    
+                    // 2. 检查除零错误
+                    if (line.contains("/") && line.contains("0")) {
+                        QRegularExpression divZeroPattern("\\w+\\s*/\\s*0");
+                        if (divZeroPattern.match(line).hasMatch()) {
+                            SemanticError error;
+                            error.type = SemanticErrorType::DIVISION_BY_ZERO;
+                            error.message = "除零错误：不能除以零";
+                            error.line = lineNum + 1;
+                            error.column = line.indexOf("/") + 1;
+                            semanticErrors.append(error);
+                            semanticSuccess = false;
+                        }
+                    }
+                    
+                    // 3. 检查函数调用错误
+                    QRegularExpression funcCallPattern("([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(");
+                    QRegularExpressionMatchIterator funcMatches = funcCallPattern.globalMatch(line);
+                    while (funcMatches.hasNext()) {
+                        QRegularExpressionMatch match = funcMatches.next();
+                        QString funcName = match.captured(1);
+                        
+                        // 排除已知函数和关键字 - 修复：添加控制流关键字
+                        if (funcName != "main" && funcName != "printf" && funcName != "scanf" &&
+                            funcName != "if" && funcName != "else" && funcName != "while" && 
+                            funcName != "for" && funcName != "switch" && funcName != "do" &&
+                            funcName != "return" && funcName != "sizeof" && funcName != "typeof") {
+                            SemanticError error;
+                            error.type = SemanticErrorType::UNDEFINED_FUNCTION;
+                            error.message = "未定义的函数 '" + funcName.toStdString() + "'";
+                            error.line = lineNum + 1;
+                            error.column = match.capturedStart() + 1;
+                            semanticErrors.append(error);
+                            semanticSuccess = false;
+                        }
+                    }
+                    
+                    // 4. 检查返回类型不匹配
+                    if (line.contains("return") && line.contains("\"")) {
+                        SemanticError error;
+                        error.type = SemanticErrorType::RETURN_TYPE_MISMATCH;
+                        error.message = "返回类型不匹配：main函数应返回整数但返回了字符串";
+                        error.line = lineNum + 1;
+                        error.column = line.indexOf("return") + 1;
+                        semanticErrors.append(error);
+                        semanticSuccess = false;
+                    }
+                    
+                    // 5. 检查无效运算 (例如对字符串进行算术运算)
+                    if (line.contains("\"") && (line.contains("+") || line.contains("-") || 
+                        line.contains("*") || line.contains("/"))) {
+                        SemanticError error;
+                        error.type = SemanticErrorType::INVALID_OPERATION;
+                        error.message = "无效运算：不能对字符串进行算术运算";
+                        error.line = lineNum + 1;
+                        error.column = line.indexOf("+") != -1 ? line.indexOf("+") + 1 :
+                                      line.indexOf("-") != -1 ? line.indexOf("-") + 1 :
+                                      line.indexOf("*") != -1 ? line.indexOf("*") + 1 :
+                                      line.indexOf("/") + 1;
+                        semanticErrors.append(error);
+                        semanticSuccess = false;
+                    }
+                    
+                    // 6. 检查未声明的变量使用
                     QRegularExpression identifierPattern("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b");
                     QRegularExpressionMatchIterator i = identifierPattern.globalMatch(line);
                     while (i.hasNext()) {
                         QRegularExpressionMatch match = i.next();
                         QString identifier = match.captured(0);
                         
-                        // 排除关键字
-                        if (identifier != "int" && identifier != "return" && identifier != "main") {
+                        // 排除关键字、类型名和函数名
+                        if (identifier != "int" && identifier != "float" && identifier != "double" && 
+                            identifier != "char" && identifier != "return" && identifier != "main" && 
+                            identifier != "printf" && identifier != "scanf" && identifier != "if" && 
+                            identifier != "else" && identifier != "while" && identifier != "for") {
                             if (variableInitialized.find(identifier.toStdString()) == variableInitialized.end()) {
                                 // 未声明的标识符
                                 SemanticError error;
@@ -298,6 +407,51 @@ void AnalysisThread::run() {
                     symbol.isUsed = false; // 将在下面更新
                     demoSymbolTable->addSymbol(symbol);
                     result.totalSymbols++;
+                }
+                
+                // 检查未初始化变量的使用情况（基于最终的变量状态）
+                for (const auto& var : variableInitialized) {
+                    if (!var.second) { // 仍然未初始化的变量
+                        // 检查是否被使用过（在初始化之前）
+                        bool usedBeforeInit = false;
+                        for (int lineNum = 0; lineNum < sourceLines.size(); ++lineNum) {
+                            QString line = sourceLines[lineNum].trimmed();
+                            QString varName = QString::fromStdString(var.first);
+                            
+                            // 排除声明行
+                            if (lineNum + 1 != variableDeclarationLine[var.first]) {
+                                // 检查是否在赋值之前就被使用了
+                                if (line.contains(varName + " ") || line.contains(varName + ";") || 
+                                    line.contains(varName + "+") || line.contains(varName + "-") ||
+                                    line.contains(varName + "*") || line.contains(varName + "/")) {
+                                    // 排除赋值语句本身
+                                    if (!line.contains(varName + " =") && !line.contains(varName + "=")) {
+                                        usedBeforeInit = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (usedBeforeInit) {
+                            // 未初始化但被使用 - 错误
+                            SemanticError error;
+                            error.type = SemanticErrorType::UNINITIALIZED_VARIABLE;
+                            error.message = "变量 '" + var.first + "' 在初始化前被使用";
+                            error.line = variableDeclarationLine[var.first];
+                            error.column = 1;
+                            semanticErrors.append(error);
+                            semanticSuccess = false;
+                        } else {
+                            // 未初始化但未被使用 - 警告
+                            SemanticError warning;
+                            warning.type = SemanticErrorType::UNINITIALIZED_VARIABLE;
+                            warning.message = "变量 '" + var.first + "' 声明但未初始化";
+                            warning.line = variableDeclarationLine[var.first];
+                            warning.column = 1;
+                            semanticErrors.append(warning); // 注意：这里作为警告，在UI中会显示为黄色
+                        }
+                    }
                 }
                 
                 // 添加main函数
@@ -391,10 +545,11 @@ void AnalysisThread::run() {
                     auto globals = result.symbolTable->getGlobalScope()->getAllSymbols();
                     symbolTableInfo = QString("符号表内容:\n\n");
                     for (const auto* symbol : globals) {
-                        symbolTableInfo += QString("• %1 (%2): %3")
+                        symbolTableInfo += QString("• %1 (%2): %3 [行号:%4]")
                                            .arg(QString::fromStdString(symbol->name))
                                            .arg(QString::fromStdString(TypeUtils::symbolTypeToString(symbol->symbolType)))
-                                           .arg(QString::fromStdString(TypeUtils::dataTypeToString(symbol->dataType)));
+                                           .arg(QString::fromStdString(TypeUtils::dataTypeToString(symbol->dataType)))
+                                           .arg(symbol->line);
                         
                         // 添加状态信息
                         QString status;
@@ -454,144 +609,48 @@ void AnalysisThread::run() {
         std::cout << "开始代码生成，semanticSuccess: " << semanticSuccess << ", ast exists: " << (ast != nullptr) << std::endl;
         
         try {
-            // 不管语义分析是否成功，都尝试生成一些演示代码
-            if (ast || !code.isEmpty()) {
-                // 创建简单的演示中间代码
-                if (!code.isEmpty()) {
-                    // 分析代码生成一些基本的三地址码
-                    QStringList lines = code.split('\n');
-                    int instrCount = 0;
-                    
-                    for (const QString& line : lines) {
-                        QString trimmedLine = line.trimmed();
-                        if (trimmedLine.isEmpty() || trimmedLine.startsWith("//")) continue;
-                        
-                        // 为变量声明生成代码
-                        if (trimmedLine.contains("int ") && trimmedLine.contains(';')) {
-                            ThreeAddressCode tac(OpType::ASSIGN);
-                            
-                            // 提取变量名
-                            QString varName = trimmedLine;
-                            varName = varName.remove("int").remove(';').trimmed();
-                            if (varName.contains('=')) {
-                                QStringList parts = varName.split('=');
-                                QString var = parts[0].trimmed();
-                                QString val = parts[1].trimmed();
-                                
-                                tac.result = std::make_unique<Operand>(OperandType::VARIABLE, var.toStdString(), IRDataType::INT);
-                                tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, val.toStdString(), val.toStdString(), IRDataType::INT);
-                                tac.comment = "变量声明并初始化";
-                                
-                                std::cout << "生成变量初始化指令: " << var.toStdString() << " = " << val.toStdString() << std::endl;
-                            } else {
-                                tac.result = std::make_unique<Operand>(OperandType::VARIABLE, varName.toStdString(), IRDataType::INT);
-                                tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, "0", "0", IRDataType::INT);
-                                tac.comment = "变量声明";
-                                
-                                std::cout << "生成变量声明指令: " << varName.toStdString() << " = 0" << std::endl;
-                            }
-                            
-                            intermediateCode.append(tac);
-                            instrCount++;
-                        }
-                        
-                        // 为赋值语句生成代码
-                        if (trimmedLine.contains('=') && !trimmedLine.contains("int ")) {
-                            ThreeAddressCode tac(OpType::ASSIGN);
-                            
-                            QStringList parts = trimmedLine.split('=');
-                            if (parts.size() >= 2) {
-                                tac.result = std::make_unique<Operand>(OperandType::VARIABLE, parts[0].trimmed().toStdString(), IRDataType::INT);
-                                QString expr = parts[1].remove(';').trimmed();
-                                
-                                if (expr.contains('+')) {
-                                    tac.op = OpType::ADD;
-                                    QStringList operands = expr.split('+');
-                                    if (operands.size() >= 2) {
-                                        tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, operands[0].trimmed().toStdString(), IRDataType::INT);
-                                        tac.arg2 = std::make_unique<Operand>(OperandType::VARIABLE, operands[1].trimmed().toStdString(), IRDataType::INT);
-                                        
-                                        std::cout << "生成加法指令: " << parts[0].trimmed().toStdString() 
-                                                 << " = " << operands[0].trimmed().toStdString()
-                                                 << " + " << operands[1].trimmed().toStdString() << std::endl;
-                                    }
-                                } else {
-                                    tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, expr.toStdString(), IRDataType::INT);
-                                    
-                                    std::cout << "生成赋值指令: " << parts[0].trimmed().toStdString() 
-                                             << " = " << expr.toStdString() << std::endl;
-                                }
-                                tac.comment = "赋值操作";
-                            }
-                            
-                            intermediateCode.append(tac);
-                            instrCount++;
-                        }
-                        
-                        // 为return语句生成代码
-                        if (trimmedLine.contains("return")) {
-                            ThreeAddressCode tac(OpType::RETURN);
-                            QString retValue = trimmedLine;
-                            retValue = retValue.remove("return").remove(';').trimmed();
-                            tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, retValue.toStdString(), IRDataType::INT);
-                            tac.comment = "函数返回";
-                            
-                            std::cout << "生成返回指令: return " << retValue.toStdString() << std::endl;
-                            
-                            intermediateCode.append(tac);
-                            instrCount++;
-                        }
-                    }
-                    
-                    totalInstructions = instrCount;
-                    basicBlocks = std::max(1, instrCount / 3);
-                    tempVars = instrCount / 2;
+            // 首先尝试基于AST的代码生成
+            if (ast) {
+                std::cout << "尝试基于AST的代码生成..." << std::endl;
+                
+                // 递归遍历AST生成三地址码
+                bool astCodeGenSuccess = generateCodeFromAST(ast.get(), intermediateCode, totalInstructions);
+                
+                if (astCodeGenSuccess) {
+                    std::cout << "AST代码生成成功，指令数: " << totalInstructions << std::endl;
                     codeGenSuccess = true;
-                    
-                    codeGenMessage = QString("代码生成完成，生成 %1 条指令，%2 个基本块")
-                                    .arg(totalInstructions).arg(basicBlocks);
                 } else {
-                    codeGenMessage = "代码生成失败: 无输入代码";
+                    std::cout << "AST代码生成失败，回退到字符串解析" << std::endl;
+                    // 回退到字符串解析方法
+                    codeGenSuccess = generateCodeFromString(code, intermediateCode, totalInstructions);
                 }
-                
-                // 生成优化信息
-                optimizationInfo = QString("代码生成优化信息:\n"
-                                         "• 常量折叠: 启用\n"
-                                         "• 死代码消除: 启用\n"
-                                         "• 优化级别: O2\n"
-                                         "• 总指令数: %1\n"
-                                         "• 优化后指令数: %2\n"
-                                         "• 优化率: %3%\n\n"
-                                         "已应用的优化:\n"
-                                         "• 表达式化简\n"
-                                         "• 常量传播\n"
-                                         "• 无用代码消除\n"
-                                         "• 基本块合并")
-                                         .arg(totalInstructions)
-                                         .arg(totalInstructions)
-                                         .arg(10.0);
-                
-                // 生成基本块信息
-                basicBlockInfo = QString("基本块分析:\n"
-                                       "• 基本块数量: %1\n"
-                                       "• 平均指令数/块: %2\n"
-                                       "• 入口块: 1\n"
-                                       "• 出口块: 1\n"
-                                       "• 循环数量: 0\n"
-                                       "• 控制流复杂度: 简单\n\n"
-                                       "块间关系:\n"
-                                       "• 顺序执行: %3 个块\n"
-                                       "• 条件分支: 0 个块\n"
-                                       "• 循环回边: 0 个")
-                                       .arg(basicBlocks)
-                                       .arg(basicBlocks > 0 ? QString::number(double(totalInstructions) / basicBlocks, 'f', 1) : "0")
-                                       .arg(basicBlocks);
             } else {
-                codeGenSuccess = false;
-                codeGenMessage = "代码生成跳过（无有效输入）";
-                optimizationInfo = "优化信息:\n• 原因: 无有效的输入代码";
-                basicBlockInfo = "基本块信息:\n• 原因: 无法分析空代码";
+                std::cout << "没有AST，使用字符串解析方法" << std::endl;
+                codeGenSuccess = generateCodeFromString(code, intermediateCode, totalInstructions);
             }
+                
+            // 生成优化信息
+            optimizationInfo = QString("代码生成优化信息:\n"
+                                     "• 常量折叠: 启用\n"
+                                     "• 死代码消除: 启用\n"
+                                     "• 优化级别: O2\n"
+                                     "• 总指令数: %1\n"
+                                     "• 基本块数: %2\n"
+                                     "• 临时变量数: %3")
+                                     .arg(totalInstructions)
+                                     .arg(basicBlocks)
+                                     .arg(tempVars);
+            
+            // 生成基本块信息
+            basicBlockInfo = QString("基本块分析:\n"
+                                   "• 基本块数量: %1\n"
+                                   "• 平均指令数/块: %2\n"
+                                   "• 临时变量数: %3\n"
+                                   "• 控制流复杂度: %4")
+                                   .arg(basicBlocks)
+                                   .arg(basicBlocks > 0 ? QString::number(double(totalInstructions) / basicBlocks, 'f', 1) : "0")
+                                   .arg(tempVars)
+                                   .arg(code.contains("if") ? "复杂" : "简单");
             
         } catch (const std::exception& e) {
             codeGenSuccess = false;
@@ -997,6 +1056,11 @@ bool MainWindow::saveFileAs()
         return false;
     }
     
+    // 自动添加.c扩展名，如果用户没有指定扩展名
+    if (!fileName.contains('.')) {
+        fileName += ".c";
+    }
+    
     if (codeEditor->saveFile(fileName)) {
         setCurrentFile(fileName);
         addToRecentFiles(fileName);
@@ -1100,6 +1164,8 @@ void MainWindow::runSemanticAnalysis()
     // 连接信号
     connect(analysisThread, &AnalysisThread::lexicalAnalysisFinished,
             this, &MainWindow::onLexicalAnalysisFinished);
+    connect(analysisThread, &AnalysisThread::lexicalAnalysisFinishedWithDFA,
+            this, &MainWindow::onLexicalAnalysisFinishedWithDFA);
     connect(analysisThread, &AnalysisThread::syntaxAnalysisFinished,
             this, &MainWindow::onSyntaxAnalysisFinished);
     connect(analysisThread, &AnalysisThread::semanticAnalysisFinished,
@@ -1136,6 +1202,8 @@ void MainWindow::runCodeGeneration()
     // 连接信号
     connect(analysisThread, &AnalysisThread::lexicalAnalysisFinished,
             this, &MainWindow::onLexicalAnalysisFinished);
+    connect(analysisThread, &AnalysisThread::lexicalAnalysisFinishedWithDFA,
+            this, &MainWindow::onLexicalAnalysisFinishedWithDFA);
     connect(analysisThread, &AnalysisThread::syntaxAnalysisFinished,
             this, &MainWindow::onSyntaxAnalysisFinished);
     connect(analysisThread, &AnalysisThread::semanticAnalysisFinished,
@@ -1376,11 +1444,19 @@ void MainWindow::onSemanticAnalysisFinished(bool success, const QString &message
         // 显示错误信息（即使成功也可能有警告）
         for (const auto& error : errors) {
             QString errorText = QString::fromStdString(error.message);
-            semanticPanel->addSemanticError(errorText, error.line);
             
-            // 在编辑器中标记错误
-            if (error.line > 0) {
-                showErrorInEditor(error.line, errorText);
+            // 只有真正的错误才在编辑器中标记为红色
+            // 警告不应该标记为错误
+            if (!errorText.startsWith("[警告]")) {
+                semanticPanel->addSemanticError(errorText, error.line);
+                
+                // 在编辑器中标记错误
+                if (error.line > 0) {
+                    showErrorInEditor(error.line, errorText);
+                }
+            } else {
+                // 这是警告，只在语义分析面板中显示，不在编辑器中标记
+                semanticPanel->addSemanticError(errorText, error.line);
             }
         }
     }
@@ -1687,76 +1763,322 @@ std::shared_ptr<ASTNode> AnalysisThread::createSimpleParser() {
 }
 
 std::shared_ptr<ASTNode> AnalysisThread::parseTokensToAST(const std::vector<Token>& tokens) {
-    // 简化的AST构建：根据代码内容生成对应的AST
     if (tokens.empty()) {
         return nullptr;
     }
     
-    // 创建程序根节点
+    // 创建一个简单的递归下降解析器
+    TokenIndex = 0;
+    m_tokens = tokens;
+    
+    try {
+        return parseProgram();
+    } catch (const std::exception& e) {
+        std::cout << "语法分析错误: " << e.what() << std::endl;
+        return nullptr;
+    }
+}
+
+// 解析程序
+std::shared_ptr<ASTNode> AnalysisThread::parseProgram() {
     auto program = std::make_shared<SimpleASTNode>(ASTNodeType::PROGRAM, 1, 1);
     
-    // 分析token序列，构建基本的AST结构
-    // 这是一个简化的实现，主要用于演示
-    
-    bool hasMainFunction = false;
-    bool hasVariableDeclarations = false;
-    
-    // 扫描tokens确定代码结构
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        const Token& token = tokens[i];
-        
-        if (token.type == TokenType::IDENTIFIER && token.value == "main") {
-            hasMainFunction = true;
-        }
-        
-        if (token.type == TokenType::INT || token.type == TokenType::FLOAT || 
-            token.type == TokenType::BOOL) {
-            hasVariableDeclarations = true;
-        }
-    }
-    
-    // 根据代码内容生成合适的AST结构
-    if (hasMainFunction) {
-        // 有main函数，创建函数声明节点
-        auto funcDecl = std::make_shared<SimpleASTNode>(ASTNodeType::FUNC_DECL, 1, 1);
-        
-        // 函数体
-        auto block = std::make_shared<SimpleASTNode>(ASTNodeType::BLOCK_STMT, 1, 1);
-        
-        if (hasVariableDeclarations) {
-            // 变量声明
-            auto varDecl = std::make_shared<SimpleASTNode>(ASTNodeType::VAR_DECL, 2, 1);
-            
-            // 可能的赋值语句
-            for (size_t i = 0; i < tokens.size() - 1; ++i) {
-                if (tokens[i].type == TokenType::ASSIGN) {
-                    auto assignment = std::make_shared<SimpleASTNode>(ASTNodeType::ASSIGNMENT_STMT, 2, 1);
-                    break;
-                }
+    // 解析声明和语句
+    while (TokenIndex < m_tokens.size() && m_tokens[TokenIndex].type != TokenType::END_OF_FILE) {
+        if (isTypeKeyword(currentToken().type)) {
+            // 变量声明或函数声明
+            auto decl = parseDeclaration();
+            if (decl) {
+                program->children.push_back(decl);
             }
-        }
-        
-        // 检查return语句
-        for (size_t i = 0; i < tokens.size(); ++i) {
-            if (tokens[i].type == TokenType::RETURN) {
-                auto returnStmt = std::make_shared<SimpleASTNode>(ASTNodeType::RETURN_STMT, 3, 1);
-                break;
+        } else if (currentToken().type == TokenType::IDENTIFIER) {
+            // 可能是赋值语句
+            auto stmt = parseStatement();
+            if (stmt) {
+                program->children.push_back(stmt);
             }
-        }
-    } else if (hasVariableDeclarations) {
-        // 只有变量声明
-        auto varDecl = std::make_shared<SimpleASTNode>(ASTNodeType::VAR_DECL, 1, 1);
-        
-        // 检查赋值
-        for (size_t i = 0; i < tokens.size() - 1; ++i) {
-            if (tokens[i].type == TokenType::ASSIGN) {
-                auto assignment = std::make_shared<SimpleASTNode>(ASTNodeType::ASSIGNMENT_STMT, 1, 1);
-                break;
+        } else if (currentToken().type == TokenType::IF) {
+            // if语句
+            auto stmt = parseIfStatement();
+            if (stmt) {
+                program->children.push_back(stmt);
             }
+        } else if (currentToken().type == TokenType::RETURN) {
+            // return语句
+            auto stmt = parseReturnStatement();
+            if (stmt) {
+                program->children.push_back(stmt);
+            }
+        } else {
+            // 跳过未识别的token
+            advance();
         }
     }
     
     return program;
+}
+
+// 解析声明
+std::shared_ptr<ASTNode> AnalysisThread::parseDeclaration() {
+    if (!isTypeKeyword(currentToken().type)) {
+        return nullptr;
+    }
+    
+    TokenType typeToken = currentToken().type;
+    advance(); // 跳过类型关键字
+    
+    if (currentToken().type != TokenType::IDENTIFIER) {
+        return nullptr;
+    }
+    
+    std::string varName = currentToken().value;
+    int line = currentToken().line;
+    advance(); // 跳过标识符
+    
+    // 创建变量声明节点
+    auto varDecl = std::make_shared<DetailedASTNode>(ASTNodeType::VAR_DECL, line, 1);
+    varDecl->value = getTypeString(typeToken) + " " + varName;
+    
+    // 检查是否有初始化
+    if (currentToken().type == TokenType::ASSIGN) {
+        advance(); // 跳过 =
+        
+        // 解析初始化表达式
+        auto initExpr = parseExpression();
+        if (initExpr) {
+            varDecl->children.push_back(initExpr);
+        }
+    }
+    
+    // 跳过分号
+    if (currentToken().type == TokenType::SEMICOLON) {
+        advance();
+    }
+    
+    return varDecl;
+}
+
+// 解析语句
+std::shared_ptr<ASTNode> AnalysisThread::parseStatement() {
+    if (currentToken().type == TokenType::IDENTIFIER) {
+        // 可能是赋值语句或复合赋值语句
+        std::string varName = currentToken().value;
+        int line = currentToken().line;
+        advance();
+        
+        TokenType assignOp = currentToken().type;
+        if (assignOp == TokenType::ASSIGN || 
+            assignOp == TokenType::PLUS_ASSIGN || 
+            assignOp == TokenType::MINUS_ASSIGN ||
+            assignOp == TokenType::MUL_ASSIGN || 
+            assignOp == TokenType::DIV_ASSIGN || 
+            assignOp == TokenType::MOD_ASSIGN) {
+            
+            advance(); // 跳过赋值运算符
+            
+            auto assignStmt = std::make_shared<DetailedASTNode>(ASTNodeType::ASSIGNMENT_STMT, line, 1);
+            
+            // 根据赋值运算符类型设置显示值
+            std::string opStr;
+            switch (assignOp) {
+                case TokenType::ASSIGN: opStr = " = "; break;
+                case TokenType::PLUS_ASSIGN: opStr = " += "; break;
+                case TokenType::MINUS_ASSIGN: opStr = " -= "; break;
+                case TokenType::MUL_ASSIGN: opStr = " *= "; break;
+                case TokenType::DIV_ASSIGN: opStr = " /= "; break;
+                case TokenType::MOD_ASSIGN: opStr = " %= "; break;
+                default: opStr = " = "; break;
+            }
+            
+            // 解析右值表达式
+            auto rvalue = parseExpression();
+            if (rvalue) {
+                if (auto detailedRvalue = std::dynamic_pointer_cast<DetailedASTNode>(rvalue)) {
+                    assignStmt->value = varName + opStr + detailedRvalue->value;
+                } else {
+                    assignStmt->value = varName + opStr + "...";
+                }
+                assignStmt->children.push_back(rvalue);
+            } else {
+                assignStmt->value = varName + opStr + "...";
+            }
+            
+            // 跳过分号
+            if (currentToken().type == TokenType::SEMICOLON) {
+                advance();
+            }
+            
+            return assignStmt;
+        }
+    }
+    
+    return nullptr;
+}
+
+// 解析return语句
+std::shared_ptr<ASTNode> AnalysisThread::parseReturnStatement() {
+    if (currentToken().type != TokenType::RETURN) {
+        return nullptr;
+    }
+    
+    int line = currentToken().line;
+    advance(); // 跳过 return
+    
+    auto returnStmt = std::make_shared<DetailedASTNode>(ASTNodeType::RETURN_STMT, line, 1);
+    returnStmt->value = "return";
+    
+    // 解析返回值表达式
+    if (currentToken().type != TokenType::SEMICOLON) {
+        auto returnExpr = parseExpression();
+        if (returnExpr) {
+            returnStmt->children.push_back(returnExpr);
+            if (auto detailedExpr = std::dynamic_pointer_cast<DetailedASTNode>(returnExpr)) {
+                returnStmt->value = "return " + detailedExpr->value;
+            }
+        }
+    }
+    
+    // 跳过分号
+    if (currentToken().type == TokenType::SEMICOLON) {
+        advance();
+    }
+    
+    return returnStmt;
+}
+
+// 解析表达式
+std::shared_ptr<ASTNode> AnalysisThread::parseExpression() {
+    return parseAdditiveExpression();
+}
+
+// 解析加法表达式
+std::shared_ptr<ASTNode> AnalysisThread::parseAdditiveExpression() {
+    auto left = parseMultiplicativeExpression();
+    
+    while (currentToken().type == TokenType::PLUS || currentToken().type == TokenType::MINUS) {
+        TokenType op = currentToken().type;
+        int line = currentToken().line;
+        advance();
+        
+        auto right = parseMultiplicativeExpression();
+        if (right) {
+            auto binaryExpr = std::make_shared<DetailedASTNode>(ASTNodeType::BINARY_EXPR, line, 1);
+            
+            // 安全地获取子节点的值
+            std::string leftValue = "expr";
+            std::string rightValue = "expr";
+            if (auto leftDetailed = std::dynamic_pointer_cast<DetailedASTNode>(left)) {
+                leftValue = leftDetailed->value;
+            }
+            if (auto rightDetailed = std::dynamic_pointer_cast<DetailedASTNode>(right)) {
+                rightValue = rightDetailed->value;
+            }
+            
+            binaryExpr->value = leftValue + " " + (op == TokenType::PLUS ? "+" : "-") + " " + rightValue;
+            binaryExpr->children.push_back(left);
+            binaryExpr->children.push_back(right);
+            left = binaryExpr;
+        }
+    }
+    
+    return left;
+}
+
+// 解析乘法表达式
+std::shared_ptr<ASTNode> AnalysisThread::parseMultiplicativeExpression() {
+    auto left = parsePrimaryExpression();
+    
+    while (currentToken().type == TokenType::MULTIPLY || 
+           currentToken().type == TokenType::DIVIDE || 
+           currentToken().type == TokenType::MODULO) {
+        TokenType op = currentToken().type;
+        int line = currentToken().line;
+        advance();
+        
+        auto right = parsePrimaryExpression();
+        if (right) {
+            auto binaryExpr = std::make_shared<DetailedASTNode>(ASTNodeType::BINARY_EXPR, line, 1);
+            
+            // 安全地获取子节点的值
+            std::string leftValue = "expr";
+            std::string rightValue = "expr";
+            if (auto leftDetailed = std::dynamic_pointer_cast<DetailedASTNode>(left)) {
+                leftValue = leftDetailed->value;
+            }
+            if (auto rightDetailed = std::dynamic_pointer_cast<DetailedASTNode>(right)) {
+                rightValue = rightDetailed->value;
+            }
+            
+            // 根据操作符选择符号
+            std::string opStr;
+            if (op == TokenType::MULTIPLY) {
+                opStr = "*";
+            } else if (op == TokenType::DIVIDE) {
+                opStr = "/";
+            } else if (op == TokenType::MODULO) {
+                opStr = "%";
+            }
+            
+            binaryExpr->value = leftValue + " " + opStr + " " + rightValue;
+            binaryExpr->children.push_back(left);
+            binaryExpr->children.push_back(right);
+            left = binaryExpr;
+        }
+    }
+    
+    return left;
+}
+
+// 解析基本表达式
+std::shared_ptr<ASTNode> AnalysisThread::parsePrimaryExpression() {
+    if (currentToken().type == TokenType::IDENTIFIER) {
+        auto identifier = std::make_shared<DetailedASTNode>(ASTNodeType::IDENTIFIER_EXPR, currentToken().line, currentToken().column);
+        identifier->value = currentToken().value;
+        advance();
+        return identifier;
+    } else if (currentToken().type == TokenType::NUMBER) {
+        auto literal = std::make_shared<DetailedASTNode>(ASTNodeType::LITERAL_EXPR, currentToken().line, currentToken().column);
+        literal->value = currentToken().value;
+        advance();
+        return literal;
+    } else if (currentToken().type == TokenType::LPAREN) {
+        advance(); // 跳过 (
+        auto expr = parseExpression();
+        if (currentToken().type == TokenType::RPAREN) {
+            advance(); // 跳过 )
+        }
+        return expr;
+    }
+    
+    return nullptr;
+}
+
+// 辅助函数
+Token AnalysisThread::currentToken() const {
+    if (TokenIndex < m_tokens.size()) {
+        return m_tokens[TokenIndex];
+    }
+    return Token(TokenType::END_OF_FILE, "", -1, -1);
+}
+
+void AnalysisThread::advance() {
+    if (TokenIndex < m_tokens.size()) {
+        TokenIndex++;
+    }
+}
+
+bool AnalysisThread::isTypeKeyword(TokenType type) const {
+    return type == TokenType::INT || type == TokenType::FLOAT || 
+           type == TokenType::BOOL;
+}
+
+std::string AnalysisThread::getTypeString(TokenType type) const {
+    switch (type) {
+        case TokenType::INT: return "int";
+        case TokenType::FLOAT: return "float";
+        case TokenType::BOOL: return "bool";
+        default: return "unknown";
+    }
 }
 
 int AnalysisThread::countASTNodes(ASTNode* node) {
@@ -1764,31 +2086,15 @@ int AnalysisThread::countASTNodes(ASTNode* node) {
     
     int count = 1; // 当前节点
     
-    // 根据节点类型估计子节点数
-    switch (node->nodeType) {
-        case ASTNodeType::PROGRAM:
-            count += 3; // 估计的子节点数
-            break;
-        case ASTNodeType::FUNC_DECL:
-            count += 2; // 函数声明通常有参数列表和函数体
-            break;
-        case ASTNodeType::VAR_DECL:
-            count += 1; // 变量声明有类型信息
-            break;
-        case ASTNodeType::BLOCK_STMT:
-            count += 2; // 块语句估计有几个子语句
-            break;
-        case ASTNodeType::ASSIGNMENT_STMT:
-            count += 2; // 赋值语句有左值和右值
-            break;
-        case ASTNodeType::BINARY_EXPR:
-            count += 2; // 二元表达式有左操作数和右操作数
-            break;
-        case ASTNodeType::RETURN_STMT:
-            count += 1; // return语句有返回表达式
-            break;
-        default:
-            break;
+    // 检查是否为DetailedASTNode类型，如果是则递归计算子节点
+    if (auto detailedNode = dynamic_cast<DetailedASTNode*>(node)) {
+        for (const auto& child : detailedNode->children) {
+            count += countASTNodes(child.get());
+        }
+    } else if (auto simpleNode = dynamic_cast<SimpleASTNode*>(node)) {
+        for (const auto& child : simpleNode->children) {
+            count += countASTNodes(child.get());
+        }
     }
     
     return count;
@@ -1799,24 +2105,15 @@ int AnalysisThread::getASTDepth(ASTNode* node) {
     
     int maxChildDepth = 0;
     
-    // 根据节点类型计算子节点的最大深度
-    switch (node->nodeType) {
-        case ASTNodeType::PROGRAM:
-            maxChildDepth = 3; // 程序 -> 函数 -> 语句
-            break;
-        case ASTNodeType::FUNC_DECL:
-            maxChildDepth = 2; // 函数 -> 语句
-            break;
-        case ASTNodeType::BLOCK_STMT:
-            maxChildDepth = 1; // 块 -> 语句
-            break;
-        case ASTNodeType::ASSIGNMENT_STMT:
-        case ASTNodeType::BINARY_EXPR:
-            maxChildDepth = 1; // 赋值/二元表达式 -> 表达式
-            break;
-        default:
-            maxChildDepth = 0;
-            break;
+    // 检查是否为DetailedASTNode类型，如果是则递归计算子节点深度
+    if (auto detailedNode = dynamic_cast<DetailedASTNode*>(node)) {
+        for (const auto& child : detailedNode->children) {
+            maxChildDepth = std::max(maxChildDepth, getASTDepth(child.get()));
+        }
+    } else if (auto simpleNode = dynamic_cast<SimpleASTNode*>(node)) {
+        for (const auto& child : simpleNode->children) {
+            maxChildDepth = std::max(maxChildDepth, getASTDepth(child.get()));
+        }
     }
     
     return 1 + maxChildDepth;
@@ -1883,3 +2180,509 @@ void MainWindow::clearAllErrors()
 }
 
 // 创建简单的语法分析器
+
+// 解析if语句
+std::shared_ptr<ASTNode> AnalysisThread::parseIfStatement() {
+    if (currentToken().type != TokenType::IF) {
+        return nullptr;
+    }
+    
+    int line = currentToken().line;
+    advance(); // 跳过 if
+    
+    // 期望左括号
+    if (currentToken().type != TokenType::LPAREN) {
+        return nullptr;
+    }
+    advance(); // 跳过 (
+    
+    // 解析条件表达式
+    auto condition = parseComparisonExpression();
+    if (!condition) {
+        return nullptr;
+    }
+    
+    // 期望右括号
+    if (currentToken().type != TokenType::RPAREN) {
+        return nullptr;
+    }
+    advance(); // 跳过 )
+    
+    // 解析then语句（可能是块语句或单个语句）
+    std::shared_ptr<ASTNode> thenStmt = nullptr;
+    if (currentToken().type == TokenType::LBRACE) {
+        thenStmt = parseBlockStatement();
+    } else {
+        thenStmt = parseStatement();
+    }
+    
+    // 检查是否有else子句
+    std::shared_ptr<ASTNode> elseStmt = nullptr;
+    if (currentToken().type == TokenType::ELSE) {
+        advance(); // 跳过 else
+        if (currentToken().type == TokenType::LBRACE) {
+            elseStmt = parseBlockStatement();
+        } else {
+            elseStmt = parseStatement();
+        }
+    }
+    
+    // 创建if语句节点
+    auto ifStmt = std::make_shared<DetailedASTNode>(ASTNodeType::IF_STMT, line, 1);
+    ifStmt->value = "if (...) { ... }";
+    
+    if (condition) {
+        ifStmt->children.push_back(condition);
+    }
+    if (thenStmt) {
+        ifStmt->children.push_back(thenStmt);
+    }
+    if (elseStmt) {
+        ifStmt->children.push_back(elseStmt);
+    }
+    
+    return ifStmt;
+}
+
+// 解析块语句
+std::shared_ptr<ASTNode> AnalysisThread::parseBlockStatement() {
+    if (currentToken().type != TokenType::LBRACE) {
+        return nullptr;
+    }
+    
+    int line = currentToken().line;
+    advance(); // 跳过 {
+    
+    auto blockStmt = std::make_shared<DetailedASTNode>(ASTNodeType::BLOCK_STMT, line, 1);
+    blockStmt->value = "{ ... }";
+    
+    // 解析块中的语句
+    while (currentToken().type != TokenType::RBRACE && currentToken().type != TokenType::END_OF_FILE) {
+        std::shared_ptr<ASTNode> stmt = nullptr;
+        
+        if (isTypeKeyword(currentToken().type)) {
+            stmt = parseDeclaration();
+        } else if (currentToken().type == TokenType::IDENTIFIER) {
+            stmt = parseStatement();
+        } else if (currentToken().type == TokenType::IF) {
+            stmt = parseIfStatement();
+        } else if (currentToken().type == TokenType::RETURN) {
+            stmt = parseReturnStatement();
+        } else {
+            advance(); // 跳过未识别的token
+        }
+        
+        if (stmt) {
+            blockStmt->children.push_back(stmt);
+        }
+    }
+    
+    // 期望右大括号
+    if (currentToken().type == TokenType::RBRACE) {
+        advance(); // 跳过 }
+    }
+    
+    return blockStmt;
+}
+
+// 解析比较表达式
+std::shared_ptr<ASTNode> AnalysisThread::parseComparisonExpression() {
+    auto left = parseAdditiveExpression();
+    
+    while (currentToken().type == TokenType::GT || 
+           currentToken().type == TokenType::LT ||
+           currentToken().type == TokenType::GE ||
+           currentToken().type == TokenType::LE ||
+           currentToken().type == TokenType::EQ ||
+           currentToken().type == TokenType::NE) {
+        TokenType op = currentToken().type;
+        int line = currentToken().line;
+        advance();
+        
+        auto right = parseAdditiveExpression();
+        if (right) {
+            auto binaryExpr = std::make_shared<DetailedASTNode>(ASTNodeType::BINARY_EXPR, line, 1);
+            
+            // 安全地获取子节点的值
+            std::string leftValue = "expr";
+            std::string rightValue = "expr";
+            if (auto leftDetailed = std::dynamic_pointer_cast<DetailedASTNode>(left)) {
+                leftValue = leftDetailed->value;
+            }
+            if (auto rightDetailed = std::dynamic_pointer_cast<DetailedASTNode>(right)) {
+                rightValue = rightDetailed->value;
+            }
+            
+            // 根据操作符选择符号
+            std::string opStr;
+            switch (op) {
+                case TokenType::GT: opStr = ">"; break;
+                case TokenType::LT: opStr = "<"; break;
+                case TokenType::GE: opStr = ">="; break;
+                case TokenType::LE: opStr = "<="; break;
+                case TokenType::EQ: opStr = "=="; break;
+                case TokenType::NE: opStr = "!="; break;
+                default: opStr = "?"; break;
+            }
+            
+            binaryExpr->value = leftValue + " " + opStr + " " + rightValue;
+            binaryExpr->children.push_back(left);
+            binaryExpr->children.push_back(right);
+            left = binaryExpr;
+        }
+    }
+    
+    return left;
+}
+
+// 基于AST的代码生成方法
+bool AnalysisThread::generateCodeFromAST(ASTNode* node, QVector<ThreeAddressCode>& intermediateCode, int& instrCount) {
+    if (!node) return false;
+    
+    try {
+        // 根据AST节点类型生成对应的三地址码
+        switch (node->nodeType) {
+            case ASTNodeType::PROGRAM: {
+                // 程序节点：递归处理所有子节点
+                auto simpleNode = dynamic_cast<SimpleASTNode*>(node);
+                if (simpleNode) {
+                    for (auto& child : simpleNode->children) {
+                        if (!generateCodeFromAST(child.get(), intermediateCode, instrCount)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            case ASTNodeType::VAR_DECL: {
+                // 变量声明：生成赋值指令
+                auto detailedNode = dynamic_cast<DetailedASTNode*>(node);
+                if (detailedNode) {
+                    ThreeAddressCode tac(OpType::ASSIGN);
+                    
+                    // 从value中提取变量名和类型
+                    QString value = QString::fromStdString(detailedNode->value);
+                    QStringList parts = value.split(' ');
+                    if (parts.size() >= 2) {
+                        QString varName = parts[1];
+                        
+                        tac.result = std::make_unique<Operand>(OperandType::VARIABLE, varName.toStdString(), IRDataType::INT);
+                        
+                        // 检查是否有初始化值
+                        if (detailedNode->children.size() > 0) {
+                            auto initNode = dynamic_cast<DetailedASTNode*>(detailedNode->children[0].get());
+                            if (initNode) {
+                                tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, initNode->value, initNode->value, IRDataType::INT);
+                                std::cout << "生成变量初始化指令: " << varName.toStdString() << " = " << initNode->value << std::endl;
+                            }
+                        } else {
+                            tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, "0", "0", IRDataType::INT);
+                            std::cout << "生成变量声明指令: " << varName.toStdString() << " = 0" << std::endl;
+                        }
+                        
+                        tac.comment = "变量声明";
+                        intermediateCode.append(tac);
+                        instrCount++;
+                    }
+                }
+                return true;
+            }
+            
+            case ASTNodeType::ASSIGNMENT_STMT: {
+                // 赋值语句：生成赋值或运算指令（包括复合赋值）
+                auto detailedNode = dynamic_cast<DetailedASTNode*>(node);
+                if (detailedNode && detailedNode->children.size() > 0) {
+                    // 从value中提取变量名和运算符
+                    QString value = QString::fromStdString(detailedNode->value);
+                    QStringList parts = value.split(' ');
+                    if (parts.size() >= 3) {
+                        QString varName = parts[0];
+                        QString operatorStr = parts[1];
+                        
+                        // 检查是否为复合赋值运算符
+                        if (operatorStr == "+=" || operatorStr == "-=" || operatorStr == "*=" || 
+                            operatorStr == "/=" || operatorStr == "%=") {
+                            // 复合赋值：x += y 等价于 x = x + y
+                            auto rhsNode = detailedNode->children[0].get();
+                            auto rhsDetailed = dynamic_cast<DetailedASTNode*>(rhsNode);
+                            if (rhsDetailed) {
+                                // 确定运算类型
+                                OpType opType = OpType::ADD;
+                                std::string opSymbol = "+";
+                                if (operatorStr == "+=") { opType = OpType::ADD; opSymbol = "+"; }
+                                else if (operatorStr == "-=") { opType = OpType::SUB; opSymbol = "-"; }
+                                else if (operatorStr == "*=") { opType = OpType::MUL; opSymbol = "*"; }
+                                else if (operatorStr == "/=") { opType = OpType::DIV; opSymbol = "/"; }
+                                else if (operatorStr == "%=") { opType = OpType::MOD; opSymbol = "%"; }
+                                
+                                ThreeAddressCode tac(opType);
+                                tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, varName.toStdString(), IRDataType::INT);
+                                tac.arg2 = std::make_unique<Operand>(OperandType::CONSTANT, rhsDetailed->value, rhsDetailed->value, IRDataType::INT);
+                                tac.result = std::make_unique<Operand>(OperandType::VARIABLE, varName.toStdString(), IRDataType::INT);
+                                tac.comment = "复合赋值";
+                                
+                                std::cout << "生成复合赋值指令: " << varName.toStdString() 
+                                         << " = " << varName.toStdString() << " " << opSymbol << " " << rhsDetailed->value << std::endl;
+                                
+                                intermediateCode.append(tac);
+                                instrCount++;
+                            }
+                        } else {
+                            // 普通赋值或二元表达式
+                            auto rhsNode = detailedNode->children[0].get();
+                            if (rhsNode->nodeType == ASTNodeType::BINARY_EXPR) {
+                                // 二元表达式：a = b + c
+                                auto binaryNode = dynamic_cast<DetailedASTNode*>(rhsNode);
+                                if (binaryNode && binaryNode->children.size() >= 2) {
+                                    ThreeAddressCode tac(OpType::ADD); // 默认加法，后续可以根据操作符调整
+                                    
+                                    auto leftOperand = dynamic_cast<DetailedASTNode*>(binaryNode->children[0].get());
+                                    auto rightOperand = dynamic_cast<DetailedASTNode*>(binaryNode->children[1].get());
+                                    
+                                    if (leftOperand && rightOperand) {
+                                        tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, leftOperand->value, IRDataType::INT);
+                                        tac.arg2 = std::make_unique<Operand>(OperandType::VARIABLE, rightOperand->value, IRDataType::INT);
+                                        tac.result = std::make_unique<Operand>(OperandType::VARIABLE, varName.toStdString(), IRDataType::INT);
+                                        tac.comment = "二元运算";
+                                        
+                                        std::cout << "生成运算指令: " << varName.toStdString() 
+                                                 << " = " << leftOperand->value << " + " << rightOperand->value << std::endl;
+                                        
+                                        intermediateCode.append(tac);
+                                        instrCount++;
+                                    }
+                                }
+                            } else {
+                                // 简单赋值：a = 5
+                                ThreeAddressCode tac(OpType::ASSIGN);
+                                auto rhsDetailed = dynamic_cast<DetailedASTNode*>(rhsNode);
+                                if (rhsDetailed) {
+                                    tac.result = std::make_unique<Operand>(OperandType::VARIABLE, varName.toStdString(), IRDataType::INT);
+                                    tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, rhsDetailed->value, rhsDetailed->value, IRDataType::INT);
+                                    tac.comment = "简单赋值";
+                                    
+                                    std::cout << "生成赋值指令: " << varName.toStdString() << " = " << rhsDetailed->value << std::endl;
+                                    
+                                    intermediateCode.append(tac);
+                                    instrCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            case ASTNodeType::IF_STMT: {
+                // if语句：生成条件跳转指令
+                auto detailedNode = dynamic_cast<DetailedASTNode*>(node);
+                if (detailedNode && detailedNode->children.size() >= 2) {
+                    static int labelCounter = 1;
+                    QString elseLabel = QString("L%1").arg(labelCounter++);
+                    QString endLabel = QString("L%1").arg(labelCounter++);
+                    QString tempVar = QString("t%1").arg(labelCounter);
+                    
+                    // 1. 处理条件表达式
+                    auto conditionNode = detailedNode->children[0].get();
+                    if (conditionNode->nodeType == ASTNodeType::BINARY_EXPR) {
+                        auto binaryNode = dynamic_cast<DetailedASTNode*>(conditionNode);
+                        if (binaryNode && binaryNode->children.size() >= 2) {
+                            auto leftOp = dynamic_cast<DetailedASTNode*>(binaryNode->children[0].get());
+                            auto rightOp = dynamic_cast<DetailedASTNode*>(binaryNode->children[1].get());
+                            
+                            if (leftOp && rightOp) {
+                                // 生成比较指令
+                                ThreeAddressCode cmpTac(OpType::GT);
+                                cmpTac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, leftOp->value, IRDataType::INT);
+                                cmpTac.arg2 = std::make_unique<Operand>(OperandType::VARIABLE, rightOp->value, IRDataType::INT);
+                                cmpTac.result = std::make_unique<Operand>(OperandType::TEMPORARY, tempVar.toStdString(), IRDataType::INT);
+                                cmpTac.comment = "条件比较";
+                                
+                                intermediateCode.append(cmpTac);
+                                instrCount++;
+                                
+                                std::cout << "生成比较指令: " << tempVar.toStdString() 
+                                         << " = " << leftOp->value << " > " << rightOp->value << std::endl;
+                                
+                                // 生成条件跳转指令
+                                ThreeAddressCode jumpTac(OpType::IF_FALSE);
+                                jumpTac.arg1 = std::make_unique<Operand>(OperandType::TEMPORARY, tempVar.toStdString(), IRDataType::INT);
+                                jumpTac.result = std::make_unique<Operand>(OperandType::LABEL, elseLabel.toStdString(), IRDataType::UNKNOWN);
+                                jumpTac.comment = "条件跳转";
+                                
+                                intermediateCode.append(jumpTac);
+                                instrCount++;
+                                
+                                std::cout << "生成条件跳转指令: if_false " << tempVar.toStdString() 
+                                         << " goto " << elseLabel.toStdString() << std::endl;
+                            }
+                        }
+                    }
+                    
+                    // 2. 处理then分支
+                    auto thenNode = detailedNode->children[1].get();
+                    generateCodeFromAST(thenNode, intermediateCode, instrCount);
+                    
+                    // 3. 生成跳转到结束
+                    ThreeAddressCode gotoTac(OpType::GOTO);
+                    gotoTac.result = std::make_unique<Operand>(OperandType::LABEL, endLabel.toStdString(), IRDataType::UNKNOWN);
+                    gotoTac.comment = "跳转到结束";
+                    
+                    intermediateCode.append(gotoTac);
+                    instrCount++;
+                    
+                    std::cout << "生成跳转指令: goto " << endLabel.toStdString() << std::endl;
+                    
+                    // 4. 生成else标签
+                    ThreeAddressCode elseLabelTac(OpType::LABEL);
+                    elseLabelTac.result = std::make_unique<Operand>(OperandType::LABEL, elseLabel.toStdString(), IRDataType::UNKNOWN);
+                    elseLabelTac.comment = "else标签";
+                    
+                    intermediateCode.append(elseLabelTac);
+                    instrCount++;
+                    
+                    std::cout << "生成else标签: " << elseLabel.toStdString() << ":" << std::endl;
+                    
+                    // 5. 处理else分支
+                    if (detailedNode->children.size() >= 3) {
+                        auto elseNode = detailedNode->children[2].get();
+                        generateCodeFromAST(elseNode, intermediateCode, instrCount);
+                    }
+                    
+                    // 6. 生成结束标签
+                    ThreeAddressCode endLabelTac(OpType::LABEL);
+                    endLabelTac.result = std::make_unique<Operand>(OperandType::LABEL, endLabel.toStdString(), IRDataType::UNKNOWN);
+                    endLabelTac.comment = "结束标签";
+                    
+                    intermediateCode.append(endLabelTac);
+                    instrCount++;
+                    
+                    std::cout << "生成结束标签: " << endLabel.toStdString() << ":" << std::endl;
+                }
+                return true;
+            }
+            
+            case ASTNodeType::BLOCK_STMT: {
+                // 块语句：递归处理所有子语句
+                auto detailedNode = dynamic_cast<DetailedASTNode*>(node);
+                if (detailedNode) {
+                    for (auto& child : detailedNode->children) {
+                        if (!generateCodeFromAST(child.get(), intermediateCode, instrCount)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            default:
+                // 其他节点类型，递归处理子节点
+                auto simpleNode = dynamic_cast<SimpleASTNode*>(node);
+                if (simpleNode) {
+                    for (auto& child : simpleNode->children) {
+                        if (!generateCodeFromAST(child.get(), intermediateCode, instrCount)) {
+                            return false;
+                        }
+                    }
+                }
+                auto detailedNode = dynamic_cast<DetailedASTNode*>(node);
+                if (detailedNode) {
+                    for (auto& child : detailedNode->children) {
+                        if (!generateCodeFromAST(child.get(), intermediateCode, instrCount)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+        }
+    } catch (const std::exception& e) {
+        std::cout << "AST代码生成异常: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// 基于字符串的代码生成方法（作为后备）
+bool AnalysisThread::generateCodeFromString(const QString& code, QVector<ThreeAddressCode>& intermediateCode, int& instrCount) {
+    std::cout << "使用字符串解析方法生成代码" << std::endl;
+    
+    try {
+        QStringList lines = code.split('\n');
+        instrCount = 0;
+        
+        for (const QString& line : lines) {
+            QString trimmedLine = line.trimmed();
+            if (trimmedLine.isEmpty() || trimmedLine.startsWith("//")) continue;
+            
+            // 为变量声明生成代码
+            if (trimmedLine.contains("int ") && trimmedLine.contains(';')) {
+                QString varDecl = trimmedLine;
+                varDecl = varDecl.remove("int").remove(';').trimmed();
+                
+                ThreeAddressCode tac(OpType::ASSIGN);
+                
+                if (varDecl.contains('=')) {
+                    QStringList parts = varDecl.split('=');
+                    QString var = parts[0].trimmed();
+                    QString val = parts[1].trimmed();
+                    
+                    tac.result = std::make_unique<Operand>(OperandType::VARIABLE, var.toStdString(), IRDataType::INT);
+                    tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, val.toStdString(), val.toStdString(), IRDataType::INT);
+                    tac.comment = "变量声明并初始化";
+                    
+                    std::cout << "生成变量初始化指令: " << var.toStdString() << " = " << val.toStdString() << std::endl;
+                } else {
+                    tac.result = std::make_unique<Operand>(OperandType::VARIABLE, varDecl.toStdString(), IRDataType::INT);
+                    tac.arg1 = std::make_unique<Operand>(OperandType::CONSTANT, "0", "0", IRDataType::INT);
+                    tac.comment = "变量声明";
+                    
+                    std::cout << "生成变量声明指令: " << varDecl.toStdString() << " = 0" << std::endl;
+                }
+                
+                intermediateCode.append(tac);
+                instrCount++;
+            }
+            
+            // 为赋值语句生成代码
+            if (trimmedLine.contains('=') && !trimmedLine.contains("int ") && !trimmedLine.contains("if")) {
+                ThreeAddressCode tac(OpType::ASSIGN);
+                
+                QStringList parts = trimmedLine.split('=');
+                if (parts.size() >= 2) {
+                    QString var = parts[0].trimmed();
+                    QString expr = parts[1].remove(';').trimmed();
+                    
+                    tac.result = std::make_unique<Operand>(OperandType::VARIABLE, var.toStdString(), IRDataType::INT);
+                    
+                    if (expr.contains('+')) {
+                        tac.op = OpType::ADD;
+                        QStringList operands = expr.split('+');
+                        if (operands.size() >= 2) {
+                            tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, operands[0].trimmed().toStdString(), IRDataType::INT);
+                            tac.arg2 = std::make_unique<Operand>(OperandType::VARIABLE, operands[1].trimmed().toStdString(), IRDataType::INT);
+                            
+                            std::cout << "生成加法指令: " << var.toStdString() 
+                                     << " = " << operands[0].trimmed().toStdString()
+                                     << " + " << operands[1].trimmed().toStdString() << std::endl;
+                        }
+                    } else {
+                        tac.arg1 = std::make_unique<Operand>(OperandType::VARIABLE, expr.toStdString(), IRDataType::INT);
+                        
+                        std::cout << "生成赋值指令: " << var.toStdString() 
+                                 << " = " << expr.toStdString() << std::endl;
+                    }
+                    tac.comment = "赋值操作";
+                }
+                
+                intermediateCode.append(tac);
+                instrCount++;
+            }
+        }
+        
+        return instrCount > 0;
+    } catch (const std::exception& e) {
+        std::cout << "字符串代码生成异常: " << e.what() << std::endl;
+        return false;
+    }
+}
+

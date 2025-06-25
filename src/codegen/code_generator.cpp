@@ -206,6 +206,27 @@ void CodeGenerator::generateStatement(StmtNode* node) {
         case ASTNodeType::WHILE_STMT:
             generateWhileStmt(dynamic_cast<WhileStmtNode*>(node));
             break;
+        case ASTNodeType::FOR_STMT:
+            generateForStmt(dynamic_cast<ForStmtNode*>(node));
+            break;
+        case ASTNodeType::DO_WHILE_STMT:
+            generateDoWhileStmt(dynamic_cast<DoWhileStmtNode*>(node));
+            break;
+        case ASTNodeType::BREAK_STMT:
+            generateBreakStmt(dynamic_cast<BreakStmtNode*>(node));
+            break;
+        case ASTNodeType::CONTINUE_STMT:
+            generateContinueStmt(dynamic_cast<ContinueStmtNode*>(node));
+            break;
+        case ASTNodeType::GOTO_STMT:
+            generateGotoStmt(dynamic_cast<GotoStmtNode*>(node));
+            break;
+        case ASTNodeType::LABEL_STMT:
+            generateLabelStmt(dynamic_cast<LabelStmtNode*>(node));
+            break;
+        case ASTNodeType::SWITCH_STMT:
+            generateSwitchStmt(dynamic_cast<SwitchStmtNode*>(node));
+            break;
         case ASTNodeType::BLOCK_STMT:
             generateBlockStmt(dynamic_cast<BlockStmtNode*>(node));
             break;
@@ -605,6 +626,317 @@ void CodeGenerator::addComment(const std::string& comment) {
     auto commentInstr = std::make_unique<ThreeAddressCode>(OpType::NOP);
     commentInstr->comment = comment;
     addInstruction(std::move(commentInstr));
+}
+
+// ============ 新增语句生成方法实现 ============
+
+void CodeGenerator::generateForStmt(ForStmtNode* node) {
+    if (!node) {
+        return;
+    }
+    
+    std::string loopLabel = newLabel();
+    std::string updateLabel = newLabel();
+    std::string endLabel = newLabel();
+    
+    // 保存之前的break/continue标签
+    std::string oldBreakLabel = breakLabel;
+    std::string oldContinueLabel = continueLabel;
+    
+    breakLabel = endLabel;
+    continueLabel = updateLabel;
+    
+    if (config.generateComments) {
+        addComment("For loop");
+    }
+    
+    // 生成初始化语句
+    if (node->init) {
+        generateStatement(node->init.get());
+    }
+    
+    // 生成循环开始标签
+    auto loopLabelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(loopLabel), node->line);
+    addInstruction(std::move(loopLabelInstr));
+    
+    // 生成条件检查
+    if (node->condition) {
+        ExprGenResult condResult = generateExpression(node->condition.get());
+        
+        // 生成条件跳转（如果条件为假，跳出循环）
+        auto condJump = InstructionUtils::createConditionalJump(
+            OpType::IF_FALSE,
+            OperandUtils::createVariable(condResult.operand, condResult.dataType),
+            OperandUtils::createLabel(endLabel),
+            node->line
+        );
+        addInstruction(std::move(condJump));
+    }
+    
+    // 生成循环体
+    if (node->body) {
+        generateStatement(node->body.get());
+    }
+    
+    // 生成更新标签（continue跳转目标）
+    auto updateLabelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(updateLabel), node->line);
+    addInstruction(std::move(updateLabelInstr));
+    
+    // 生成更新表达式
+    if (node->update) {
+        generateExpression(node->update.get());
+    }
+    
+    // 生成跳转回循环开始
+    auto gotoLoop = InstructionUtils::createGoto(
+        OperandUtils::createLabel(loopLabel), node->line);
+    addInstruction(std::move(gotoLoop));
+    
+    // 生成循环结束标签
+    auto endLabelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(endLabel), node->line);
+    addInstruction(std::move(endLabelInstr));
+    
+    // 恢复之前的标签
+    breakLabel = oldBreakLabel;
+    continueLabel = oldContinueLabel;
+}
+
+void CodeGenerator::generateDoWhileStmt(DoWhileStmtNode* node) {
+    if (!node) {
+        return;
+    }
+    
+    std::string loopLabel = newLabel();
+    std::string condLabel = newLabel();
+    std::string endLabel = newLabel();
+    
+    // 保存之前的break/continue标签
+    std::string oldBreakLabel = breakLabel;
+    std::string oldContinueLabel = continueLabel;
+    
+    breakLabel = endLabel;
+    continueLabel = condLabel;
+    
+    if (config.generateComments) {
+        addComment("Do-while loop");
+    }
+    
+    // 生成循环开始标签
+    auto loopLabelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(loopLabel), node->line);
+    addInstruction(std::move(loopLabelInstr));
+    
+    // 生成循环体
+    if (node->body) {
+        generateStatement(node->body.get());
+    }
+    
+    // 生成条件检查标签（continue跳转目标）
+    auto condLabelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(condLabel), node->line);
+    addInstruction(std::move(condLabelInstr));
+    
+    // 生成条件表达式
+    if (node->condition) {
+        ExprGenResult condResult = generateExpression(node->condition.get());
+        
+        // 生成条件跳转（如果条件为真，继续循环）
+        auto condJump = InstructionUtils::createConditionalJump(
+            OpType::IF_TRUE,
+            OperandUtils::createVariable(condResult.operand, condResult.dataType),
+            OperandUtils::createLabel(loopLabel),
+            node->line
+        );
+        addInstruction(std::move(condJump));
+    }
+    
+    // 生成循环结束标签
+    auto endLabelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(endLabel), node->line);
+    addInstruction(std::move(endLabelInstr));
+    
+    // 恢复之前的标签
+    breakLabel = oldBreakLabel;
+    continueLabel = oldContinueLabel;
+}
+
+void CodeGenerator::generateBreakStmt(BreakStmtNode* node) {
+    if (!node) {
+        return;
+    }
+    
+    if (config.generateComments) {
+        addComment("Break statement");
+    }
+    
+    if (breakLabel.empty()) {
+        addError("Break statement outside of loop or switch");
+        return;
+    }
+    
+    // 生成跳转到break标签
+    auto breakJump = InstructionUtils::createGoto(
+        OperandUtils::createLabel(breakLabel), node->line);
+    addInstruction(std::move(breakJump));
+}
+
+void CodeGenerator::generateContinueStmt(ContinueStmtNode* node) {
+    if (!node) {
+        return;
+    }
+    
+    if (config.generateComments) {
+        addComment("Continue statement");
+    }
+    
+    if (continueLabel.empty()) {
+        addError("Continue statement outside of loop");
+        return;
+    }
+    
+    // 生成跳转到continue标签
+    auto continueJump = InstructionUtils::createGoto(
+        OperandUtils::createLabel(continueLabel), node->line);
+    addInstruction(std::move(continueJump));
+}
+
+void CodeGenerator::generateGotoStmt(GotoStmtNode* node) {
+    if (!node) {
+        return;
+    }
+    
+    if (config.generateComments) {
+        addComment("Goto statement to label: " + node->label);
+    }
+    
+    // 生成跳转到指定标签
+    auto gotoJump = InstructionUtils::createGoto(
+        OperandUtils::createLabel(node->label), node->line);
+    addInstruction(std::move(gotoJump));
+}
+
+void CodeGenerator::generateLabelStmt(LabelStmtNode* node) {
+    if (!node) {
+        return;
+    }
+    
+    if (config.generateComments) {
+        addComment("Label: " + node->label);
+    }
+    
+    // 生成标签
+    auto labelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(node->label), node->line);
+    addInstruction(std::move(labelInstr));
+    
+    // 如果有关联语句，生成它
+    if (node->statement) {
+        generateStatement(node->statement.get());
+    }
+}
+
+void CodeGenerator::generateSwitchStmt(SwitchStmtNode* node) {
+    if (!node) {
+        return;
+    }
+    
+    if (config.generateComments) {
+        addComment("Switch statement");
+    }
+    
+    std::string endLabel = newLabel();
+    std::vector<std::string> caseLabels;
+    std::string defaultLabel;
+    
+    // 保存之前的break标签
+    std::string oldBreakLabel = breakLabel;
+    breakLabel = endLabel;
+    
+    // 生成switch表达式
+    ExprGenResult switchResult = generateExpression(node->expression.get());
+    
+    // 为每个case生成标签
+    for (size_t i = 0; i < node->cases.size(); ++i) {
+        caseLabels.push_back(newLabel());
+    }
+    
+    // 如果有default，生成default标签
+    if (node->defaultCase) {
+        defaultLabel = newLabel();
+    }
+    
+    // 生成case比较和跳转
+    for (size_t i = 0; i < node->cases.size(); ++i) {
+        const auto& caseStmt = node->cases[i];
+        if (caseStmt && caseStmt->value) {
+            // 生成case值表达式
+            ExprGenResult caseResult = generateExpression(caseStmt->value.get());
+            
+            // 生成比较临时变量
+            std::string tempVar = newTemp();
+            auto compareInstr = InstructionUtils::createBinaryOp(
+                OpType::EQ,
+                OperandUtils::createTemporary(tempVar, switchResult.dataType),
+                OperandUtils::createVariable(switchResult.operand, switchResult.dataType),
+                OperandUtils::createVariable(caseResult.operand, caseResult.dataType),
+                node->line
+            );
+            addInstruction(std::move(compareInstr));
+            
+            // 生成条件跳转到case标签
+            auto caseJump = InstructionUtils::createConditionalJump(
+                OpType::IF_TRUE,
+                OperandUtils::createTemporary(tempVar, switchResult.dataType),
+                OperandUtils::createLabel(caseLabels[i]),
+                node->line
+            );
+            addInstruction(std::move(caseJump));
+        }
+    }
+    
+    // 如果没有匹配的case，跳转到default或end
+    std::string finalTarget = node->defaultCase ? defaultLabel : endLabel;
+    auto defaultJump = InstructionUtils::createGoto(
+        OperandUtils::createLabel(finalTarget), node->line);
+    addInstruction(std::move(defaultJump));
+    
+    // 生成各个case的代码
+    for (size_t i = 0; i < node->cases.size(); ++i) {
+        const auto& caseStmt = node->cases[i];
+        if (caseStmt) {
+            // 生成case标签
+            auto caseLabelInstr = InstructionUtils::createLabel(
+                OperandUtils::createLabel(caseLabels[i]), caseStmt->line);
+            addInstruction(std::move(caseLabelInstr));
+            
+            // 生成case语句
+            for (const auto& stmt : caseStmt->statements) {
+                if (stmt) {
+                    generateStatement(stmt.get());
+                }
+            }
+        }
+    }
+    
+    // 生成default case（如果有）
+    if (node->defaultCase) {
+        auto defaultLabelInstr = InstructionUtils::createLabel(
+            OperandUtils::createLabel(defaultLabel), node->line);
+        addInstruction(std::move(defaultLabelInstr));
+        
+        generateStatement(node->defaultCase.get());
+    }
+    
+    // 生成switch结束标签
+    auto endLabelInstr = InstructionUtils::createLabel(
+        OperandUtils::createLabel(endLabel), node->line);
+    addInstruction(std::move(endLabelInstr));
+    
+    // 恢复之前的break标签
+    breakLabel = oldBreakLabel;
 }
 
 // ============ CodeGeneratorFactory类实现 ============

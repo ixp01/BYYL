@@ -128,6 +128,41 @@ public:
     void generateExpressionStmt(ExpressionStmtNode* node);
     
     /**
+     * @brief 生成for语句
+     */
+    void generateForStmt(ForStmtNode* node);
+    
+    /**
+     * @brief 生成do-while语句
+     */
+    void generateDoWhileStmt(DoWhileStmtNode* node);
+    
+    /**
+     * @brief 生成break语句
+     */
+    void generateBreakStmt(BreakStmtNode* node);
+    
+    /**
+     * @brief 生成continue语句
+     */
+    void generateContinueStmt(ContinueStmtNode* node);
+    
+    /**
+     * @brief 生成goto语句
+     */
+    void generateGotoStmt(GotoStmtNode* node);
+    
+    /**
+     * @brief 生成标签语句
+     */
+    void generateLabelStmt(LabelStmtNode* node);
+    
+    /**
+     * @brief 生成switch语句
+     */
+    void generateSwitchStmt(SwitchStmtNode* node);
+    
+    /**
      * @brief 生成表达式
      */
     ExprGenResult generateExpression(ExprNode* node);

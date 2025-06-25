@@ -272,6 +272,12 @@ public:
      * @brief 设置配置
      */
     void setConfig(const SemanticAnalyzerConfig& cfg);
+
+private:
+    /**
+     * @brief 获取复合赋值运算符对应的二元运算符
+     */
+    TokenType getCorrespondingBinaryOp(TokenType compoundAssignOp) const;
 };
 
 /**

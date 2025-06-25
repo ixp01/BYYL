@@ -241,12 +241,12 @@ ExpressionType SemanticAnalyzer::analyzeIdentifier(IdentifierNode* node) {
     // 标记为已使用
     symbolTable->markSymbolUsed(node->name);
     
-    // 检查是否已初始化
+    // 检查是否已初始化 - 使用未初始化变量时报错误
     if (config.checkUninitializedVars && !symbol->isInitialized && 
         symbol->symbolType == SymbolType::VARIABLE) {
-        addWarning(SemanticErrorType::UNINITIALIZED_VARIABLE, 
-                  "Variable '" + node->name + "' used before initialization",
-                  node->line, node->column);
+        addError(SemanticErrorType::UNINITIALIZED_VARIABLE, 
+                "Variable '" + node->name + "' used before initialization",
+                node->line, node->column);
     }
     
     // 返回类型信息
@@ -414,12 +414,15 @@ void SemanticAnalyzer::analyzeVariableDecl(VariableDeclNode* node) {
     
     symbol.isInitialized = isInitialized;
     
-    // 添加到符号表
+    // 添加到符号表 - 变量声明本身不报错，即使未初始化
     if (!symbolTable->addSymbol(symbol)) {
         addError(SemanticErrorType::REDEFINED_VARIABLE, 
                 "Failed to add variable '" + node->name + "' to symbol table",
                 node->line, node->column);
     }
+    
+    // 注意：这里不再对未初始化的变量声明报错或警告
+    // 警告将在checkUninitializedVariables()中根据使用情况处理
 }
 
 void SemanticAnalyzer::analyzeFunctionDecl(FunctionDeclNode* node) {
@@ -575,10 +578,43 @@ void SemanticAnalyzer::analyzeAssignmentStmt(AssignmentStmtNode* node) {
         return;
     }
     
-    // 检查类型兼容性
-    if (lvalueType.dataType != DataType::UNKNOWN && rvalueType.dataType != DataType::UNKNOWN) {
-        checkTypeCompatibility(lvalueType.dataType, rvalueType.dataType, 
-                             "assignment", node->line, node->column);
+    // 对于复合赋值运算符，需要检查左值是否已初始化
+    if (node->assignmentOperator != TokenType::ASSIGN) {
+        if (auto identNode = dynamic_cast<IdentifierNode*>(node->lvalue.get())) {
+            SymbolInfo* symbol = symbolTable->findSymbol(identNode->name);
+            if (symbol && !symbol->isInitialized) {
+                addError(SemanticErrorType::UNINITIALIZED_VARIABLE,
+                        "Variable '" + identNode->name + "' used in compound assignment before initialization",
+                        node->line, node->column);
+                return;
+            }
+        }
+        
+        // 检查复合赋值运算符的兼容性
+        DataType resultType = TypeUtils::getBinaryOperationResultType(
+            lvalueType.dataType, rvalueType.dataType, getCorrespondingBinaryOp(node->assignmentOperator));
+        
+        if (resultType == DataType::UNKNOWN) {
+            addError(SemanticErrorType::TYPE_MISMATCH,
+                    "Incompatible types for compound assignment: " + 
+                    TypeUtils::dataTypeToString(lvalueType.dataType) + " " + 
+                    Token::getTypeString(node->assignmentOperator) + " " +
+                    TypeUtils::dataTypeToString(rvalueType.dataType),
+                    node->line, node->column);
+            return;
+        }
+        
+        // 检查结果类型是否可以赋值给左值
+        if (!checkTypeCompatibility(lvalueType.dataType, resultType,
+                                   "compound assignment result", node->line, node->column)) {
+            return;
+        }
+    } else {
+        // 普通赋值：检查类型兼容性
+        if (lvalueType.dataType != DataType::UNKNOWN && rvalueType.dataType != DataType::UNKNOWN) {
+            checkTypeCompatibility(lvalueType.dataType, rvalueType.dataType, 
+                                 "assignment", node->line, node->column);
+        }
     }
     
     // 标记左值变量为已初始化
@@ -717,8 +753,14 @@ void SemanticAnalyzer::checkUninitializedVariables() {
     
     for (SymbolInfo* symbol : uninitVars) {
         if (symbol->isUsed) {
+            // 未初始化但被使用的变量 - 报错误
+            addError(SemanticErrorType::UNINITIALIZED_VARIABLE, 
+                    "Variable '" + symbol->name + "' used before initialization",
+                    symbol->line, symbol->column);
+        } else {
+            // 未初始化但未被使用的变量 - 报警告（黄色）
             addWarning(SemanticErrorType::UNINITIALIZED_VARIABLE, 
-                      "Variable '" + symbol->name + "' used before initialization",
+                      "Variable '" + symbol->name + "' declared but not initialized",
                       symbol->line, symbol->column);
         }
     }
@@ -763,4 +805,17 @@ std::unique_ptr<SemanticAnalyzer> SemanticAnalyzerFactory::createPermissive() {
     config.strictTypeChecking = false;
     
     return std::make_unique<SemanticAnalyzer>(config);
+}
+
+// ============ SemanticAnalyzer私有方法实现 ============
+
+TokenType SemanticAnalyzer::getCorrespondingBinaryOp(TokenType compoundAssignOp) const {
+    switch (compoundAssignOp) {
+        case TokenType::PLUS_ASSIGN:  return TokenType::PLUS;
+        case TokenType::MINUS_ASSIGN: return TokenType::MINUS;
+        case TokenType::MUL_ASSIGN:   return TokenType::MULTIPLY;
+        case TokenType::DIV_ASSIGN:   return TokenType::DIVIDE;
+        case TokenType::MOD_ASSIGN:   return TokenType::MODULO;
+        default:                      return TokenType::UNKNOWN;
+    }
 } 
